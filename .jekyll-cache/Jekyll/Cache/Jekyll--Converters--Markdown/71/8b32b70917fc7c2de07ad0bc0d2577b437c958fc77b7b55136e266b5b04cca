@@ -1,0 +1,44 @@
+I"�<p>在 v1.6 版本的 harbor 中新增加了 helm charts 的管理功能,这样就可以利用 harbor 同时管理镜像和 helm charts 了，在部署 kubernetes 相关应用时就比较方便，本次尝试用 harbor 来管理 helm charts。</p>
+
+<h3 id="启用harbor的chart-repository-服务">启用Harbor的chart repository 服务</h3>
+<p>默认新版 harbor 不会启用 chart repository service，如果需要管理 helm，我们需要在安装时添加额外的参数，例如：</p>
+<pre><code class="language-SHELL">$ cd /srv/harbor
+$ ./install.sh --with-chartmuseum
+</code></pre>
+
+<h3 id="安装成功后可以把harbor做为helm-charts的仓库">安装成功后可以把harbor做为helm charts的仓库</h3>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">[</span>root@caas1 /]# helm repo add <span class="nt">--username</span><span class="o">=</span>admin <span class="nt">--password</span><span class="o">=</span>Harbor12345 myrepo http://192.168.1.103/chartrepo/helmcharts
+<span class="s2">"myrepo"</span> has been added to your repositories
+<span class="o">[</span>root@caas1 /]# helm repo list
+NAME  	URL                                                   
+<span class="nb">local 	</span>http://127.0.0.1:8879/charts                          
+stable	https://kubernetes.oss-cn-hangzhou.aliyuncs.com/charts
+myrepo	http://192.168.1.103/chartrepo/helmcharts
+
+上面的helmcharts实际上是harbor的项目名。
+也可以直接chartrepo<span class="o">(</span>chartrepo是固定的不是项目名<span class="o">)</span>
+</code></pre></div></div>
+
+<h3 id="上传charts到harbor">上传charts到harbor</h3>
+<p>因为我们需要用 helm push命令上传，该命令是通过 helm plugin实现的，但是默认 helm 没有安装此插件，需要安装：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>helm plugin <span class="nb">install </span>https://github.com/chartmuseum/helm-push //安装helm push插件
+
+helm fetch stable/redis-ha  //下载redis-ha 包
+
+helm push <span class="nt">--username</span><span class="o">=</span>admin <span class="nt">--password</span><span class="o">=</span>Harbor12345 redis-ha-2.0.1.tgz myrepo  //上传redis-ha tar包到harbor
+</code></pre></div></div>
+
+<h3 id="从harbor下载charts并安装">从Harbor下载charts并安装</h3>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>helm install myrepo/redis-ha //安装myrepo仓库的redis
+</code></pre></div></div>
+
+<h3 id="遇到问题">遇到问题</h3>
+<p>1.上传chart到harbor的Repoistory仓库，使用helm search myrepo查询不到。
+解决方法：</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>helm repo updata //更新仓库即可
+</code></pre></div></div>
+
+<p>2.添加harbor成为helm的Repoistory仓库失败
+解决方法 <br />
+因为harbor的仓库名称固定的是chartrepo这个。开始当成项目名了所以一直没有上传成功。</p>
+:ET

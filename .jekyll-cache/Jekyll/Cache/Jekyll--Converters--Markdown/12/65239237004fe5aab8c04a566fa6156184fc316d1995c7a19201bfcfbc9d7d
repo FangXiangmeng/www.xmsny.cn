@@ -1,0 +1,267 @@
+I":H<h2 id="简介">简介</h2>
+<p>从Kubernetes 1.8开始，资源使用指标（如容器CPU和内存使用率）可以通过Metrics API在Kubernetes中获取。这些指标可以直接被用户访问（例如通过使用kubectl top命令），或由集群中的控制器使用（例如，Horizo​​ntal Pod Autoscale可以使用这些指标作出决策)。</p>
+
+<h2 id="创建证书">创建证书</h2>
+
+<p>Metrics API的URI是/apis/metrics.k8s.io/，扩展了Kubernetes的核心API，因此在往集群中部署metrics-server之前需要确认Kubernetes集群配置了Aggregation Layer(聚合层)。</p>
+
+<p>1.创建聚合层API证书
+如果想开启聚合层API，需要创建几个与聚合层API相关的证书。</p>
+
+<p>安装cfssl
+方式一：直接使用二进制源码包安装</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>wget https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
+<span class="nv">$ </span><span class="nb">chmod</span> +x cfssl_linux-amd64
+<span class="nv">$ </span><span class="nb">mv </span>cfssl_linux-amd64 /usr/local/bin/cfssl
+
+<span class="nv">$ </span>wget https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
+<span class="nv">$ </span><span class="nb">chmod</span> +x cfssljson_linux-amd64
+<span class="nv">$ </span><span class="nb">mv </span>cfssljson_linux-amd64 /usr/local/bin/cfssljson
+
+<span class="nv">$ </span>wget https://pkg.cfssl.org/R1.2/cfssl-certinfo_linux-amd64
+<span class="nv">$ </span><span class="nb">chmod</span> +x cfssl-certinfo_linux-amd64
+<span class="nv">$ </span><span class="nb">mv </span>cfssl-certinfo_linux-amd64 /usr/local/bin/cfssl-certinfo
+
+<span class="nv">$ </span><span class="nb">export </span><span class="nv">PATH</span><span class="o">=</span>/usr/local/bin:<span class="nv">$PATH</span>
+方式二：使用去命令安装
+
+<span class="nv">$ </span>go get <span class="nt">-u</span> github.com/cloudflare/cfssl/cmd/...
+<span class="nv">$ </span><span class="nb">ls</span> <span class="nv">$GOPATH</span>/bin/cfssl<span class="k">*</span>
+cfssl cfssl-bundle cfssl-certinfo cfssljson cfssl-newkey cfssl-scan
+在<span class="nv">$GOPATH</span>/bin目录下得到以cfssl开头的几个命令。
+</code></pre></div></div>
+<blockquote>
+  <p>注意：以下文章中出现的cat的文件名如果不存在需要手工创建。</p>
+</blockquote>
+
+<ul>
+  <li>创建CA（证书颁发机构）</li>
+  <li>创建CA配置文件</li>
+</ul>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span><span class="nb">mkdir</span> /root/ssl
+<span class="nv">$ </span><span class="nb">cd</span> /root/ssl
+<span class="nv">$ </span>cfssl print-defaults config <span class="o">&gt;</span> config.json
+<span class="nv">$ </span>cfssl print-defaults csr <span class="o">&gt;</span> csr.json
+</code></pre></div></div>
+
+<p>1 根据config.json文件的格式创建如下的ca-config.json文件
+2 过期时间设置成了 87600h</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span><span class="nb">cat</span> <span class="o">&gt;</span> aggregator-ca-config.json <span class="o">&lt;&lt;</span><span class="no">EOF</span><span class="sh">
+{
+  "signing": {
+    "default": {
+      "expiry": "87600h"
+    },
+    "profiles": {
+      "aggregator": {
+        "usages": [
+            "signing",
+            "key encipherment",
+            "server auth",
+            "client auth"
+        ],
+        "expiry": "87600h"
+      }
+    }
+  }
+}
+</span><span class="no">EOF
+</span></code></pre></div></div>
+
+<h3 id="字段说明">字段说明：</h3>
+
+<ul>
+  <li>profiles ：可以定义多个个人资料，分别指定不同的过期时间，使用场景等参数;后续在签名证书时使用某个个人资料。</li>
+  <li>signing：表示该证书可用于签名其它证书;生成的aggregator-ca.pem证书中CA=TRUE。</li>
+  <li>server auth ：表示客户端可以用该CA对服务器提供的证书进行验证。</li>
+  <li>client auth ：表示Server可以用该CA对Client提供的证书进行验证。</li>
+</ul>
+
+<p>1 创建CA证书签名请求</p>
+
+<p>2 创建³³ aggregator-ca-csr.json文件，内容如下：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">{</span>
+  <span class="s2">"CN"</span>: <span class="s2">"aggregator"</span>,
+  <span class="s2">"key"</span>: <span class="o">{</span>
+    <span class="s2">"algo"</span>: <span class="s2">"rsa"</span>,
+    <span class="s2">"size"</span>: 2048
+  <span class="o">}</span>,
+  <span class="s2">"names"</span>: <span class="o">[</span>
+    <span class="o">{</span>
+      <span class="s2">"C"</span>: <span class="s2">"CN"</span>,
+      <span class="s2">"ST"</span>: <span class="s2">"Shanghai"</span>,
+      <span class="s2">"L"</span>: <span class="s2">"Shanghai"</span>,
+      <span class="s2">"O"</span>: <span class="s2">"k8s"</span>,
+      <span class="s2">"OU"</span>: <span class="s2">"System"</span>
+    <span class="o">}</span>
+  <span class="o">]</span>,
+    <span class="s2">"ca"</span>: <span class="o">{</span>
+       <span class="s2">"expiry"</span>: <span class="s2">"87600h"</span>
+    <span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<h3 id="字段说明-1">字段说明：</h3>
+
+<ul>
+  <li>“CN”：Common Name，kube-apiserver从证书中提取该字段作为请求的用户名（用户名）;浏览器使用该字段验证网站是否合法。</li>
+  <li>“O”： Organization，KUBE-API 服务器从证书中提取该字段作为请求用户所属的组（组）;</li>
+</ul>
+
+<p>1 生成CA证书和私</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>cfssl gencert <span class="nt">-initca</span> aggregator-ca-csr.json | cfssljson <span class="nt">-bare</span> aggregator-ca
+<span class="nv">$ </span><span class="nb">ls </span>aggregator-ca<span class="k">*</span>
+aggregator-ca-config.json  aggregator-ca.csr  aggregator-ca-csr.json  aggregator-ca-key.pem  aggregator-ca.pem
+</code></pre></div></div>
+<p>1 创建kubernetes证书
+2 创建聚合器证书签名请求文件aggregator-csr.json：</p>
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="pi">{</span>
+    <span class="s2">"</span><span class="s">CN"</span><span class="pi">:</span> <span class="s2">"</span><span class="s">aggregator"</span><span class="pi">,</span>
+    <span class="s2">"</span><span class="s">hosts"</span><span class="pi">:</span> <span class="pi">[</span>
+      <span class="s2">"</span><span class="s">127.0.0.1"</span><span class="pi">,</span>
+      <span class="s2">"</span><span class="s">192.168.123.250"</span><span class="pi">,</span>
+      <span class="s2">"</span><span class="s">192.168.123.248"</span><span class="pi">,</span>
+      <span class="s2">"</span><span class="s">192.168.123.249"</span><span class="pi">,</span>
+      <span class="s2">"</span><span class="s">10.254.0.1"</span><span class="pi">,</span>
+      <span class="s2">"</span><span class="s">kubernetes"</span><span class="pi">,</span>
+      <span class="s2">"</span><span class="s">kubernetes.default"</span><span class="pi">,</span>
+      <span class="s2">"</span><span class="s">kubernetes.default.svc"</span><span class="pi">,</span>
+      <span class="s2">"</span><span class="s">kubernetes.default.svc.cluster"</span><span class="pi">,</span>
+      <span class="s2">"</span><span class="s">kubernetes.default.svc.cluster.local"</span>
+    <span class="pi">],</span>
+    <span class="s2">"</span><span class="s">key"</span><span class="pi">:</span> <span class="pi">{</span>
+        <span class="s2">"</span><span class="s">algo"</span><span class="pi">:</span> <span class="s2">"</span><span class="s">rsa"</span><span class="pi">,</span>
+        <span class="s2">"</span><span class="s">size"</span><span class="pi">:</span> <span class="nv">2048</span>
+    <span class="pi">},</span>
+    <span class="s2">"</span><span class="s">names"</span><span class="pi">:</span> <span class="pi">[</span>
+        <span class="pi">{</span>
+            <span class="s2">"</span><span class="s">C"</span><span class="pi">:</span> <span class="s2">"</span><span class="s">CN"</span><span class="pi">,</span>
+            <span class="s2">"</span><span class="s">ST"</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Shanghai"</span><span class="pi">,</span>
+            <span class="s2">"</span><span class="s">L"</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Shanghai"</span><span class="pi">,</span>
+            <span class="s2">"</span><span class="s">O"</span><span class="pi">:</span> <span class="s2">"</span><span class="s">k8s"</span><span class="pi">,</span>
+            <span class="s2">"</span><span class="s">OU"</span><span class="pi">:</span> <span class="s2">"</span><span class="s">System"</span>
+        <span class="pi">}</span>
+    <span class="pi">]</span>
+<span class="pi">}</span>
+</code></pre></div></div>
+<ul>
+  <li>如果主机字段不为空则需要指定授权使用该证书的IP或域名列表，由于该证书后续被etd集群和kubernetes主集群使用，所以上面分别指定了etcd集群，kubernetes master集群的主机IP和kubernetes服务的服务IP（一般是kube-apiserver指定的service-cluster-ip-range网段的第一个IP，如10.254.0.1）。
+    <blockquote>
+      <p>以上物理节点的IP也可以更换为主机名。</p>
+    </blockquote>
+  </li>
+</ul>
+
+<p>1 生成aggregator证书和私</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ cfssl gencert -ca=aggregator-ca.pem -ca-key=aggregator-ca-key.pem -config=aggregator-ca-config.json -profile=aggregator aggregator-csr.json | cfssljson -bare aggregator
+$ ls aggregator*
+aggregator.csr  aggregator-csr.json  aggregator-key.pem  aggregator.pem
+</code></pre></div></div>
+<p>2 分发证书
+将生成的证书和秘钥文件（后缀名为.pem）拷贝到Master节点的/etc/kubernetes/ssl目录下备用。</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span><span class="nb">cp</span> <span class="k">*</span>.pem /etc/kubernetes/ssl
+</code></pre></div></div>
+
+<p>3 开启聚合层API
+kube-apiserver 增加以下配置：</p>
+<ul>
+  <li>–requestheader-client-ca-file=/etc/kubernetes/ssl/aggregator-ca.pem</li>
+  <li>–requestheader-allowed-names=aggregator</li>
+  <li>–requestheader-extra-headers-prefix=X-Remote-Extra-</li>
+  <li>–requestheader-group-headers=X-Remote-Group</li>
+  <li>–requestheader-username-headers=X-Remote-User</li>
+  <li>–proxy-client-cert-file=/etc/kubernetes/ssl/aggregator.pem</li>
+  <li>–proxy-client-key-file=/etc/kubernetes/ssl/aggregator-key.pem</li>
+</ul>
+
+<blockquote>
+  <p>注意
+创建前面证书的的CN字段的值必须状语从句：参数–requestheader-allowed-names指定的值aggregator相同。</p>
+</blockquote>
+
+<p>重启kube-apiserver：</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ systemctl daemon-reload
+$ systemctl restart kube-apiserver
+</code></pre></div></div>
+<blockquote>
+  <p>如果kube-proxy没有在Master上面运行，apiserver还需要添加配置：</p>
+  <div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nt">--enable-aggregator-routing</span><span class="o">=</span><span class="nb">true</span>
+</code></pre></div>  </div>
+</blockquote>
+
+<h2 id="安装metrics-server">安装metrics-server</h2>
+<p>https://github.com/kubernetes-incubator/metrics-server/tree/master/deploy  下载相关yaml文件。</p>
+
+<p><img src="D:/有道云存储/qqF92BCC0821E4E2EABBA59CC968555837/mdimage/kube-state-server配置.png" alt="修改配置内容" /></p>
+
+<p>1 修改metrics-server-deployment.yaml
+增加上面红框内容</p>
+<ul>
+  <li>–kubelet-insecure-tls：跳过验证Kubelet CA证书。不建议用于生产用途，但在具有自签名Kubelet服务证书的测试群集中非常有用。</li>
+  <li>–kubelet-preferred-address-types：连接到Kubelet时考虑不同Kubelet地址节点类型的顺序功能类似于API服务器上的同名标志。这块使用的是主机ip，默认是主机hostname。</li>
+</ul>
+
+<p>2 创建yaml</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl create <span class="nt">-f</span> aggregated-metrics-reader.yaml 
+kubectl create <span class="nt">-f</span> auth-delegator.yaml  
+kubectl create <span class="nt">-f</span> auth-reader.yaml  
+kubectl create <span class="nt">-f</span> metrics-apiservice.yaml  
+kubectl create <span class="nt">-f</span> metrics-server-deployment.yaml  
+kubectl create <span class="nt">-f</span> metrics-server-service.yaml  
+kubectl create <span class="nt">-f</span> resource-reader.yaml
+</code></pre></div></div>
+<p>3 部署完成后使用下面的命令查看node、pod相关的指标：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl get <span class="nt">--raw</span> <span class="s2">"/apis/metrics.k8s.io/v1beta1/nodes"</span>
+kubectl get <span class="nt">--raw</span> <span class="s2">"/apis/metrics.k8s.io/v1beta1/pods"</span>
+</code></pre></div></div>
+<p>然后通过api:8080/apis/metrics.k8s.io/v1beta1/去看资源使用
+<img src="D:/有道云存储/qqF92BCC0821E4E2EABBA59CC968555837/mdimage/metrics-api.png" alt="修改配置内容" /></p>
+
+<h2 id="遇到问题">遇到问题</h2>
+<ol>
+  <li>开始没用–kubelet-preferred-address-types，容器去解析主机名称解析不到。持续报错。
+当时解决方法：（给容器添加hosts解析）
+<img src="D:/有道云存储/qqF92BCC0821E4E2EABBA59CC968555837/mdimage/pod-hostnames.png" alt="修改配置内容" /></li>
+</ol>
+
+<p>也可以在kube-dns或者coredns里面添加，kube-dns添加没成功</p>
+
+<ol>
+  <li>
+    <p>kubectl top node不可用。
+解决方法：
+目前1.10一下版本需要依赖heapster。当时使用的1.9.3版本所以kubectl top不可用。</p>
+  </li>
+  <li>
+    <p>403报错
+报错如下：</p>
+    <div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>E0117 00:55:33.544214       1 manager.go:102] unable to fully collect metrics: <span class="o">[</span>unable to fully scrape metrics from <span class="nb">source </span>kubelet_summary:ctc-caas-node01: unable to fetch metrics from Kubelet ctc-caas-node01 <span class="o">(</span>192.168.154.27<span class="o">)</span>: request failed - <span class="s2">"403 Forbidden"</span>, response: <span class="s2">"Forbidden (user=system:anonymous, verb=get, resource=nodes, subresource=stats)"</span>, unable to fully scrape metrics from <span class="nb">source </span>kubelet_summary:ctc-caas-matsr01: unable to fetch metrics from Kubelet ctc-caas-matsr01 <span class="o">(</span>192.168.154.26<span class="o">)</span>: request failed - <span class="s2">"403 Forbidden"</span>, response: <span class="s2">"Forbidden (user=system:anonymous, verb=get, resource=nodes, subresource=stats)"</span>, unable to fully scrape metrics from <span class="nb">source </span>kubelet_summary:ctc-caas-node02: unable to fetch metrics from Kubelet ctc-caas-node02 <span class="o">(</span>192.168.154.28<span class="o">)</span>: request failed - <span class="s2">"403 Forbidden"</span>, response: <span class="s2">"Forbidden (user=system:anonymous, verb=get, resource=nodes, subresource=stats)"</span><span class="o">]</span>
+</code></pre></div>    </div>
+    <p><strong>解决方法：</strong>\</p>
+  </li>
+</ol>
+
+<p><strong>第一种解决方法：</strong>
+在启动kubelet的时候修改–authorization-mode = Webhook为–authorization-mode = AlwaysAllow，可以避免403，但不安全;</p>
+
+<p><strong>第二种解决方法：</strong>
+使用kubeconfig，在启动指标 - 服务器容器的时候添加如下命令（在YAML中添加）：</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>command：
+- / metrics-server 
+- --kubelet-insecure-tls 
+- --kubeconfig=/key/kubeconfig
+</code></pre></div></div>
+<p>–kubeconfig=/key/kubeconfig使用指定的kubeconfig，确保容器内部/key/ kubeconfig里面为kubeconfig内容，可以采用挂在卷的方式</p>
+
+<p>3 metrics-server获取不到数据</p>
+
+<p>报错信息:</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>E0117 00:55:33.544214       1 manager.go:102] unable to fully collect metrics: <span class="o">[</span>unable to fully scrape metrics from <span class="nb">source </span>kubelet_summary:ctc-caas-node01: unable to fetch metrics from Kubelet ctc-caas-node01 <span class="o">(</span>192.168.154.27<span class="o">)</span>: request failed - <span class="s2">"403 Forbidden"</span>, response: <span class="s2">"Forbidden (user=system:anonymous, verb=get, resource=nodes, subresource=stats)"</span>, unable to fully scrape metrics from <span class="nb">source </span>kubelet_summary:ctc-caas-matsr01: unable to fetch metrics from Kubelet ctc-caas-matsr01 <span class="o">(</span>192.168.154.26<span class="o">)</span>: request failed - <span class="s2">"403 Forbidden"</span>, response: <span class="s2">"Forbidden (user=system:anonymous, verb=get, resource=nodes, subresource=stats)"</span>, unable to fully scrape metrics from <span class="nb">source </span>kubelet_summary:ctc-caas-node02: unable to fetch metrics from Kubelet ctc-caas-node02 <span class="o">(</span>192.168.154.28<span class="o">)</span>: request failed - <span class="s2">"403 Forbidden"</span>, response: <span class="s2">"Forbidden (user=system:anonymous, verb=get, resource=nodes, subresource=stats)"</span><span class="o">]</span>
+</code></pre></div></div>
+<p><strong>解决方法</strong><br />
+临时解决方法：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>匿名帐号绑定一个cluster-admin的权限
+kubectl create clusterrolebinding system:anonymous   <span class="nt">--clusterrole</span><span class="o">=</span>cluster-admin   <span class="nt">--user</span><span class="o">=</span>system:anonymous
+</code></pre></div></div>
+:ET

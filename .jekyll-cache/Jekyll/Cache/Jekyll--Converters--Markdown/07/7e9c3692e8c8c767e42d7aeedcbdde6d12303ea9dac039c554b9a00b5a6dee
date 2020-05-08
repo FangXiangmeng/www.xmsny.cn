@@ -1,0 +1,40 @@
+I"/<h2 id="docker17安装到centos65且内核版本26">docker1.7安装到centos6.5且内核版本2.6</h2>
+
+<h3 id="下载需要的rpm包">下载需要的rpm包</h3>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>RHEL6
+curl -O -sSL https://get.docker.com/rpm/1.7.1/centos-6/RPMS/x86_64/docker-engine-1.7.1-1.el6.x86_64.rpm
+RHEL7
+curl -O -sSL https://get.docker.com/rpm/1.7.1/centos-7/RPMS/x86_64/docker-engine-1.7.1-1.el7.centos.x86_64.rpm
+</code></pre></div></div>
+
+<h3 id="使用yum安装">使用yum安装</h3>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>yum localinstall --nogpgcheck docker-engine-1.7.1-1.el6.x86_64.rpm
+</code></pre></div></div>
+
+<h3 id="启动docker">启动docker</h3>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>service docker start
+Starting cgconfig service: [ OK ]
+Starting docker: [ OK ]
+</code></pre></div></div>
+<h3 id="执行完启动后发现报错">执行完启动后发现报错</h3>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>docker: relocation error: docker: symbol dm_task_get_info_with_deferred_remove, version Base not defined in file libdevmapper.so.1.02 with link time reference
+</code></pre></div></div>
+
+<h3 id="解决方法">解决方法</h3>
+<p>1.找不到docker进程，docker启动失败</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>发现是libdevmapper.so.1.02模块的问题，于是安装该模块所在的包
+yum upgrade device-mapper-libs
+</code></pre></div></div>
+
+<p>但是
+默认的源可能会导致相关的镜像无法下载，这个问题修改本地的docker源就可以了具体如下
+编辑docker配置文件
+other_args=”–insecure-registry hub.ityy.ultrapower.com.cn:5050”
+保存并重启docker</p>
+<h4 id="登陆docker">登陆Docker</h4>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>docker login hub.ityy.ultrapower.com.cn:5050
+</code></pre></div></div>
+<blockquote>
+  <p>完成</p>
+</blockquote>
+:ET
