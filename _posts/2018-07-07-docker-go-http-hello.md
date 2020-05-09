@@ -1,16 +1,15 @@
 ---
 layout: post
 title: Docker部署Golang的hello world服务
-subtitle:   ""
-description: "Golang简单高效，而且可以很方便的编写web服务，因此在微服务领域非常受欢迎。而我也非常喜欢这门语言，第一次通
+subtitle:   "Golang简单高效，而且可以很方便的编写web服务，因此在微服务领域非常受欢迎。而我也非常喜欢这门语言，第一次通
 过docker部署服务就很自然的选择了golang编写的hello world服务。"
 date: 2018-07-07T11:25:13+08:00
 author: "FangXiangMeng"
-published: true  
+published: true
 tags:
   - Docker
-categories: [ Docs ]
 ---
+
 Golang简单高效，而且可以很方便的编写web服务，因此在微服务领域非常受欢迎。而我也非常喜欢这门语言，第一次通过docker部署服务就很自然的选择了golang编写的hello world服务。
 <!--more-->
 ### 1. 编写Golang  Hello World服务
@@ -58,13 +57,13 @@ CMD ["go", "run", "/httpHello.go"]
 Sending build context to Docker daemon  3.072kB
 Step 1/4 : FROM golang
 latest: Pulling from library/golang
-0bd44ff9c2cf: Pull complete 
-047670ddbd2a: Pull complete 
-ea7d5dc89438: Pull complete 
-ae7ad5906a75: Pull complete 
-15f6351ddb37: Pull complete 
-823ef4e8c9c9: Pull complete 
-dca1089cfb86: Pull complete 
+0bd44ff9c2cf: Pull complete
+047670ddbd2a: Pull complete
+ea7d5dc89438: Pull complete
+ae7ad5906a75: Pull complete
+15f6351ddb37: Pull complete
+823ef4e8c9c9: Pull complete
+dca1089cfb86: Pull complete
 Digest: sha256:3b70f4747eb2c74ddf517b548c4ca8071a0c0b8b9c4ef5933e9a98372e03390f
 Status: Downloaded newer image for golang:latest
  ---> 4e611157870f
