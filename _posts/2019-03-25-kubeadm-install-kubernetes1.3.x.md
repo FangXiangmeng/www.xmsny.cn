@@ -25,7 +25,7 @@ categories: [ Docs ]
 ### 安装前准备
 **1.关闭selinux**
 
-```
+```shell
 $ setenforce 0
 $ sed -i 's/^SELINUX=enforcing$/SELINUX=disabled/' /etc/selinux/config
 ```
@@ -39,6 +39,7 @@ $ cat <<EOF >  /etc/sysctl.d/k8s.conf
 net.bridge.bridge-nf-call-ip6tables = 1
 net.bridge.bridge-nf-call-iptables = 1
 EOF
+
 $ sysctl -p /etc/sysctl.d/k8s.conf
 ```
 确保br_netfilter在此步骤之前加载了模块。这可以通过运行来完成```lsmod | grep br_netfilter```。要加载它显式调用```modprobe br_netfilter```。
@@ -51,7 +52,7 @@ $ sudo yum install docker-ce docker-ce-cli containerd.io
 
 **4.配置docker cgroupdriver**
 
-```
+```shell
 $ systemctl cat docker
 # /usr/lib/systemd/system/docker.service
 [Unit]
@@ -217,7 +218,7 @@ etcd-0               Healthy   {"health": "true"}
 
 > flannel网段修改成kubeadm init --pod-network-cidr这个网段相同的
 
-```
+```yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
