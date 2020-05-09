@@ -1,8 +1,7 @@
 ---
 layout: post
 title: Docker部署Golang的hello world服务
-subtitle:   "Golang简单高效，而且可以很方便的编写web服务，因此在微服务领域非常受欢迎。而我也非常喜欢这门语言，第一次通
-过docker部署服务就很自然的选择了golang编写的hello world服务。"
+subtitle:   ""
 date: 2018-07-07T11:25:13+08:00
 author: "FangXiangMeng"
 published: true
