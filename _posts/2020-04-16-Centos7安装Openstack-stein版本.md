@@ -1,12 +1,11 @@
 # Centos7.4 安装Openstack Stein版本
 
 ## 一、环境准备
-
+```
 安装组件 | 节点IP | 网卡名
----|---|---|---|
-controller | 192.168.172.179 | ens160、ens192
-computer | 192.168.172.180 | ens160
-
+controller  192.168.172.179 ens160、ens192
+computer 192.168.172.180 ens160
+```
 
 ## 二、环境配置
 ```
