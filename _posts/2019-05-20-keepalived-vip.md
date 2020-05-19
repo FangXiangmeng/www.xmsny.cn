@@ -1,4 +1,14 @@
-## Keepalived VIP切换失败问题&双VIP问题解决
+---
+layout: post
+title: Keepalived VIP切换失败问题&双VIP问题解决
+subtitle:   ""
+description: ""
+date: 2019-05-20T11:25:13+08:00
+author: "FangXiangMeng"
+published: true
+tags:
+  - Keepliaved,Linux
+---
 
 **报错日志**
 ```log
