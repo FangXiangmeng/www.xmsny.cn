@@ -1,3 +1,15 @@
+---
+layout: post
+title: "Centos7安装Openstack stein版本并集成Ceph RBD"
+subtitle:   ""
+description: ""
+date: 2020-04-16T11:44:13+08:00
+author: "FangXiangMeng"
+tags:
+  - Openstack
+---
+
+
 # Centos7.4 安装Openstack Stein版本
 
 ## 一、环境准备
