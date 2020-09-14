@@ -1,0 +1,209 @@
+I"�W<!--more-->
+<p>本文将向展示如何配置容器的存活和可读性探针。</p>
+
+<p>Kubelet使用liveness probe（存活探针）来确定何时重启容器。例如，当应用程序处于运行状态但无法做进一步操作，liveness探针将捕获到deadlock，重启处于该状态下的容器，使应用程序在存在bug的情况下依然能够继续运行下去（谁的程序还没几个bug呢）。</p>
+
+<p>Kubelet使用readiness probe（就绪探针）来确定容器是否已经就绪可以接受流量。只有当Pod中的容器都处于就绪状态时kubelet才会认定该Pod处于就绪状态。该信号的作用是控制哪些Pod应该作为service的后端。如果Pod处于非就绪状态，那么它们将会被从service的load balancer中移除。</p>
+
+<h2 id="定义-liveness命令">定义 liveness命令</h2>
+<p>许多长时间运行的应用程序最终会转换到broken状态，除非重新启动，否则无法恢复。Kubernetes提供了liveness probe来检测和补救这种情况。
+在本次练习将基于 gcr.io/google_containers/busybox镜像创建运行一个容器的Pod。以下是Pod的配置文件exec-liveness.yaml：</p>
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Pod</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">labels</span><span class="pi">:</span>
+    <span class="na">test</span><span class="pi">:</span> <span class="s">liveness</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">liveness-exec</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">containers</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">liveness</span>
+    <span class="na">args</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="s">/bin/sh</span>
+    <span class="pi">-</span> <span class="s">-c</span>
+    <span class="pi">-</span> <span class="s">touch /tmp/healthy; sleep 30; rm -rf /tmp/healthy; sleep </span><span class="m">600</span>
+    <span class="na">image</span><span class="pi">:</span> <span class="s">gcr.io/google_containers/busybox</span>
+    <span class="na">livenessProbe</span><span class="pi">:</span>
+      <span class="na">exec</span><span class="pi">:</span>
+        <span class="na">command</span><span class="pi">:</span>
+        <span class="pi">-</span> <span class="s">cat</span>
+        <span class="pi">-</span> <span class="s">/tmp/healthy</span>
+      <span class="na">initialDelaySeconds</span><span class="pi">:</span> <span class="m">5</span>
+      <span class="na">periodSeconds</span><span class="pi">:</span> <span class="m">5</span>
+</code></pre></div></div>
+
+<p>该配置文件给Pod配置了一个容器。periodSeconds 规定kubelet要每隔5秒执行一次liveness probe。 initialDelaySeconds 告诉kubelet在第一次执行probe之前要的等待5秒钟。探针检测命令是在容器中执行 cat /tmp/healthy 命令。如果命令执行成功，将返回0，kubelet就会认为该容器是活着的并且很健康。如果返回非0值，kubelet就会杀掉这个容器并重启它。</p>
+
+<p>容器启动时，执行该命令：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>/bin/sh <span class="nt">-c</span> <span class="s2">"touch /tmp/healthy; sleep 30; rm -rf /tmp/healthy; sleep 600"</span>
+</code></pre></div></div>
+<p>在容器生命的最初30秒内有一个 /tmp/healthy 文件，在这30秒内 cat /tmp/healthy命令会返回一个成功的返回码。30秒后， cat /tmp/healthy 将返回失败的返回码。</p>
+
+<p>创建Pod：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl create <span class="nt">-f</span> https://k8s.io/docs/tasks/configure-pod-container/exec-liveness.yaml
+</code></pre></div></div>
+<p>在30秒内，查看Pod的event：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl describe pod liveness-exec
+结果显示没有失败的liveness probe：
+FirstSeen    LastSeen    Count   From            SubobjectPath           Type        Reason      Message
+<span class="nt">---------</span> <span class="nt">--------</span>    <span class="nt">-----</span>   <span class="nt">----</span>            <span class="nt">-------------</span>           <span class="nt">--------</span>    <span class="nt">------</span>      <span class="nt">-------</span>
+24s       24s     1   <span class="o">{</span>default-scheduler <span class="o">}</span>                    Normal      Scheduled   Successfully assigned liveness-exec to worker0
+23s       23s     1   <span class="o">{</span>kubelet worker0<span class="o">}</span>   spec.containers<span class="o">{</span>liveness<span class="o">}</span>   Normal      Pulling     pulling image <span class="s2">"gcr.io/google_containers/busybox"</span>
+23s       23s     1   <span class="o">{</span>kubelet worker0<span class="o">}</span>   spec.containers<span class="o">{</span>liveness<span class="o">}</span>   Normal      Pulled      Successfully pulled image <span class="s2">"gcr.io/google_containers/busybox"</span>
+23s       23s     1   <span class="o">{</span>kubelet worker0<span class="o">}</span>   spec.containers<span class="o">{</span>liveness<span class="o">}</span>   Normal      Created     Created container with docker <span class="nb">id </span>86849c15382e<span class="p">;</span> Security:[seccomp<span class="o">=</span>unconfined]
+23s       23s     1   <span class="o">{</span>kubelet worker0<span class="o">}</span>   spec.containers<span class="o">{</span>liveness<span class="o">}</span>   Normal      Started     Started container with docker <span class="nb">id </span>86849c15382e
+</code></pre></div></div>
+<p>启动35秒后，再次查看pod的event：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl describe pod liveness-exec
+在最下面有一条信息显示liveness probe失败，容器被删掉并重新创建。
+FirstSeen LastSeen    Count   From            SubobjectPath           Type        Reason      Message
+<span class="nt">---------</span> <span class="nt">--------</span>    <span class="nt">-----</span>   <span class="nt">----</span>            <span class="nt">-------------</span>           <span class="nt">--------</span>    <span class="nt">------</span>      <span class="nt">-------</span>
+37s       37s     1   <span class="o">{</span>default-scheduler <span class="o">}</span>                    Normal      Scheduled   Successfully assigned liveness-exec to worker0
+36s       36s     1   <span class="o">{</span>kubelet worker0<span class="o">}</span>   spec.containers<span class="o">{</span>liveness<span class="o">}</span>   Normal      Pulling     pulling image <span class="s2">"gcr.io/google_containers/busybox"</span>
+36s       36s     1   <span class="o">{</span>kubelet worker0<span class="o">}</span>   spec.containers<span class="o">{</span>liveness<span class="o">}</span>   Normal      Pulled      Successfully pulled image <span class="s2">"gcr.io/google_containers/busybox"</span>
+36s       36s     1   <span class="o">{</span>kubelet worker0<span class="o">}</span>   spec.containers<span class="o">{</span>liveness<span class="o">}</span>   Normal      Created     Created container with docker <span class="nb">id </span>86849c15382e<span class="p">;</span> Security:[seccomp<span class="o">=</span>unconfined]
+36s       36s     1   <span class="o">{</span>kubelet worker0<span class="o">}</span>   spec.containers<span class="o">{</span>liveness<span class="o">}</span>   Normal      Started     Started container with docker <span class="nb">id </span>86849c15382e
+2s        2s      1   <span class="o">{</span>kubelet worker0<span class="o">}</span>   spec.containers<span class="o">{</span>liveness<span class="o">}</span>   Warning     Unhealthy   Liveness probe failed: <span class="nb">cat</span>: can<span class="s1">'t open '</span>/tmp/healthy<span class="s1">': No such file or directory
+</span></code></pre></div></div>
+<p>再等30秒，确认容器已经重启：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl get pod liveness-exec
+从输出结果来RESTARTS值加1了。
+NAME            READY     STATUS    RESTARTS   AGE
+liveness-exec   1/1       Running   1          1m
+</code></pre></div></div>
+<h2 id="定义一个liveness-http请求">定义一个liveness HTTP请求</h2>
+<p>我们还可以使用HTTP GET请求作为liveness probe。下面是一个基于<code class="highlighter-rouge">gcr.io/google_containers/liveness</code>镜像运行了一个容器的Pod的例子http-liveness.yaml：</p>
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Pod</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">labels</span><span class="pi">:</span>
+    <span class="na">test</span><span class="pi">:</span> <span class="s">liveness</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">liveness-http</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">containers</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">liveness</span>
+    <span class="na">args</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="s">/server</span>
+    <span class="na">image</span><span class="pi">:</span> <span class="s">gcr.io/google_containers/liveness</span>
+    <span class="na">livenessProbe</span><span class="pi">:</span>
+      <span class="na">httpGet</span><span class="pi">:</span>
+        <span class="na">path</span><span class="pi">:</span> <span class="s">/healthz</span>
+        <span class="na">port</span><span class="pi">:</span> <span class="m">8080</span>
+        <span class="na">httpHeaders</span><span class="pi">:</span>
+          <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">X-Custom-Header</span>
+            <span class="na">value</span><span class="pi">:</span> <span class="s">Awesome</span>
+      <span class="na">initialDelaySeconds</span><span class="pi">:</span> <span class="m">3</span>
+      <span class="na">periodSeconds</span><span class="pi">:</span> <span class="m">3</span>
+</code></pre></div></div>
+<p>该配置文件只定义了一个容器，livenessProbe 指定kubelete需要每隔3秒执行一次liveness probe。initialDelaySeconds 指定kubelet在该执行第一次探测之前需要等待3秒钟。该探针将向容器中的server的8080端口发送一个HTTP GET请求。如果server的/healthz路径的handler返回一个成功的返回码，kubelet就会认定该容器是活着的并且很健康。如果返回失败的返回码，kubelet将杀掉该容器并重启它。
+任何大于200小于400的返回码都会认定是成功的返回码。其他返回码都会被认为是失败的返回码。
+查看该server的源码：server.go.
+最开始的10秒该容器是活着的， <code class="highlighter-rouge">/healthz handler</code>返回200的状态码。这之后将返回500的返回码。</p>
+<div class="language-go highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">http</span><span class="o">.</span><span class="n">HandleFunc</span><span class="p">(</span><span class="s">"/healthz"</span><span class="p">,</span> <span class="k">func</span><span class="p">(</span><span class="n">w</span> <span class="n">http</span><span class="o">.</span><span class="n">ResponseWriter</span><span class="p">,</span> <span class="n">r</span> <span class="o">*</span><span class="n">http</span><span class="o">.</span><span class="n">Request</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">duration</span> <span class="o">:=</span> <span class="n">time</span><span class="o">.</span><span class="n">Now</span><span class="p">()</span><span class="o">.</span><span class="n">Sub</span><span class="p">(</span><span class="n">started</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">duration</span><span class="o">.</span><span class="n">Seconds</span><span class="p">()</span> <span class="o">&gt;</span> <span class="m">10</span> <span class="p">{</span>
+        <span class="n">w</span><span class="o">.</span><span class="n">WriteHeader</span><span class="p">(</span><span class="m">500</span><span class="p">)</span>
+        <span class="n">w</span><span class="o">.</span><span class="n">Write</span><span class="p">([]</span><span class="kt">byte</span><span class="p">(</span><span class="n">fmt</span><span class="o">.</span><span class="n">Sprintf</span><span class="p">(</span><span class="s">"error: %v"</span><span class="p">,</span> <span class="n">duration</span><span class="o">.</span><span class="n">Seconds</span><span class="p">())))</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="n">w</span><span class="o">.</span><span class="n">WriteHeader</span><span class="p">(</span><span class="m">200</span><span class="p">)</span>
+        <span class="n">w</span><span class="o">.</span><span class="n">Write</span><span class="p">([]</span><span class="kt">byte</span><span class="p">(</span><span class="s">"ok"</span><span class="p">))</span>
+    <span class="p">}</span>
+<span class="p">})</span>
+</code></pre></div></div>
+<p>容器启动3秒后，kubelet开始执行健康检查。第一次健康监测会成功，但是10秒后，健康检查将失败，kubelet将杀掉和重启容器。
+创建一个Pod来测试一下HTTP liveness检测：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl create <span class="nt">-f</span> https://k8s.io/docs/tasks/configure-pod-container/http-liveness.yaml
+After 10 seconds, view Pod events to verify that liveness probes have failed and the Container has been restarted:
+</code></pre></div></div>
+<p>10秒后，查看Pod的event，确认liveness probe失败并重启了容器。</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl describe pod liveness-http
+</code></pre></div></div>
+
+<h2 id="定义tcp-liveness探针">定义TCP liveness探针</h2>
+<p>第三种liveness probe使用TCP Socket。 使用此配置，kubelet将尝试在指定端口上打开容器的套接字。 如果可以建立连接，容器被认为是健康的，如果不能就认为是失败的。</p>
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Pod</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">goproxy</span>
+  <span class="na">labels</span><span class="pi">:</span>
+    <span class="na">app</span><span class="pi">:</span> <span class="s">goproxy</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">containers</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">goproxy</span>
+    <span class="na">image</span><span class="pi">:</span> <span class="s">gcr.io/google_containers/goproxy:0.1</span>
+    <span class="na">ports</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">containerPort</span><span class="pi">:</span> <span class="m">8080</span>
+    <span class="na">readinessProbe</span><span class="pi">:</span>
+      <span class="na">tcpSocket</span><span class="pi">:</span>
+        <span class="na">port</span><span class="pi">:</span> <span class="m">8080</span>
+      <span class="na">initialDelaySeconds</span><span class="pi">:</span> <span class="m">5</span>
+      <span class="na">periodSeconds</span><span class="pi">:</span> <span class="m">10</span>
+    <span class="na">livenessProbe</span><span class="pi">:</span>
+      <span class="na">tcpSocket</span><span class="pi">:</span>
+        <span class="na">port</span><span class="pi">:</span> <span class="m">8080</span>
+      <span class="na">initialDelaySeconds</span><span class="pi">:</span> <span class="m">15</span>
+      <span class="na">periodSeconds</span><span class="pi">:</span> <span class="m">20</span>
+</code></pre></div></div>
+<p>如您所见，TCP检查的配置与HTTP检查非常相似。 此示例同时使用了readiness和liveness probe。 容器启动后5秒钟，kubelet将发送第一个readiness probe。 这将尝试连接到端口8080上的goproxy容器。如果探测成功，则该pod将被标记为就绪。Kubelet将每隔10秒钟执行一次该检查。</p>
+
+<p>除了<code class="highlighter-rouge">readiness probe</code>之外，该配置还包括<code class="highlighter-rouge">liveness probe</code>。 容器启动15秒后，kubelet将运行第一个liveness probe。 就像readiness probe一样，这将尝试连接到goproxy容器上的8080端口。如果liveness probe失败，容器将重新启动。</p>
+
+<p><strong>使用命名的端口</strong>
+可以使用命名的ContainerPort作为HTTP或TCP liveness检查：</p>
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">ports</span><span class="pi">:</span>
+<span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">liveness-port</span>
+  <span class="na">containerPort</span><span class="pi">:</span> <span class="m">8080</span>
+  <span class="na">hostPort</span><span class="pi">:</span> <span class="m">8080</span>
+
+<span class="na">livenessProbe</span><span class="pi">:</span>
+  <span class="na">httpGet</span><span class="pi">:</span>
+  <span class="na">path</span><span class="pi">:</span> <span class="s">/healthz</span>
+  <span class="na">port</span><span class="pi">:</span> <span class="s">liveness-port</span>
+</code></pre></div></div>
+
+<h2 id="定义readiness探针">定义readiness探针</h2>
+<p>有时，应用程序暂时无法对外部流量提供服务。 例如，应用程序可能需要在启动期间加载大量数据或配置文件。 在这种情况下，你不想杀死应用程序，但你也不想发送请求。 Kubernetes提供了readiness probe来检测和减轻这些情况。 Pod中的容器可以报告自己还没有准备，不能处理Kubernetes服务发送过来的流量。</p>
+
+<p><code class="highlighter-rouge">Readiness probe</code>的配置跟<code class="highlighter-rouge">liveness probe</code>很像。唯一的不同是使用readinessProbe而不是livenessProbe。</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">readinessProbe</span><span class="pi">:</span>
+  <span class="na">exec</span><span class="pi">:</span>
+    <span class="na">command</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="s">cat</span>
+    <span class="pi">-</span> <span class="s">/tmp/healthy</span>
+  <span class="na">initialDelaySeconds</span><span class="pi">:</span> <span class="m">5</span>
+  <span class="na">periodSeconds</span><span class="pi">:</span> <span class="m">5</span>
+</code></pre></div></div>
+
+<blockquote>
+  <p>Readiness probe的HTTP和TCP的探测器配置跟liveness probe一样。</p>
+</blockquote>
+
+<p><code class="highlighter-rouge">Readiness</code>和<code class="highlighter-rouge">livenss probe</code>可以并行用于同一容器。 使用两者可以确保流量无法到达未准备好的容器，并且容器在失败时重新启动。</p>
+
+<h2 id="配置probe">配置Probe</h2>
+
+<p><code class="highlighter-rouge">Probe</code> 中有很多精确和详细的配置，通过它们你能准确的控制liveness和readiness检查：</p>
+
+<ul>
+  <li>initialDelaySeconds：容器启动后第一次执行探测是需要等待多少秒。\</li>
+  <li>periodSeconds：执行探测的频率。默认是10秒，最小1秒。\</li>
+  <li>timeoutSeconds：探测超时时间。默认1秒，最小1秒。\</li>
+  <li>successThreshold：探测失败后，最少连续探测成功多少次才被认定为成功。默认是1。对于liveness必须是1。最小值是1。\</li>
+  <li>failureThreshold：探测成功后，最少连续探测失败多少次才被认定为失败。默认是3。最小值是1。</li>
+</ul>
+
+<p><code class="highlighter-rouge">HTTP probe</code>中可以给 httpGet设置其他配置项：</p>
+
+<ul>
+  <li>host：连接的主机名，默认连接到pod的IP。你可能想在http header中设置”Host”而不是使用IP。\</li>
+  <li>scheme：连接使用的schema，默认HTTP。\</li>
+  <li>path: 访问的HTTP server的path。\</li>
+  <li>httpHeaders：自定义请求的header。HTTP运行重复的header。\</li>
+  <li>port：访问的容器的端口名字或者端口号。端口号必须介于1和65535之间。</li>
+</ul>
+
+<p>对于HTTP探测器，kubelet向指定的路径和端口发送HTTP请求以执行检查。 Kubelet将probe发送到容器的IP地址，除非地址被httpGet中的可选host字段覆盖。 在大多数情况下，你不想设置主机字段。 有一种情况下你可以设置它。 假设容器在127.0.0.1上侦听，并且Pod的hostNetwork字段为true。 然后，在httpGet下的host应该设置为127.0.0.1。 如果你的pod依赖于虚拟主机，这可能是更常见的情况，你不应该是用host，而是应该在httpHeaders中设置Host头。</p>
+
+<h2 id="参考">参考</h2>
+<p>kuberentes官网的这篇文章<a href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/">Configure Liveness and Readiness Probes</a>来一探究竟。</p>
+:ET

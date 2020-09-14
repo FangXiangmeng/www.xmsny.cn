@@ -7,6 +7,7 @@ date: 2020-04-16T11:44:13+08:00
 author: "FangXiangMeng"
 tags:
   - Openstack
+  - 虚拟化
 ---
 
 
