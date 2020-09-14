@@ -5,10 +5,8 @@ subtitle: ""
 description: "注入nginx sidecar容器到服务中"
 date: 2019-06-10T11:25:13+08:00
 author: "FangXiangMeng"
-published: true
 tags:
   - Kubernetes
-categories: [ Docs ]
 ---
 
 
