@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 服务注入nginx sidecat
+title: 服务注入nginx sidecar
 subtitle: ""
 description: "注入nginx sidecar容器到服务中"
 date: 2019-06-10T11:25:13+08:00
