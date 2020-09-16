@@ -2,7 +2,7 @@
 layout: post
 title: terraform管理openstack
 subtitle:   ""
-date: 2020-04-015T11:25:13+08:00
+date: 2020-04-15T11:25:13+08:00
 author: "FangXiangMeng"
 published: true
 tags:
@@ -118,7 +118,7 @@ resource "openstack_compute_instance_v2" "basic" {
 
 ### 遇到问题
 #### 1.解决依赖关系。
-```
+```text
 depends_on引用整个资源，而不是具体的属性值这种。需要写成openstack_compute_instance_v2.basic而不是openstack_compute_instance_v2.basic.id
 ```
 

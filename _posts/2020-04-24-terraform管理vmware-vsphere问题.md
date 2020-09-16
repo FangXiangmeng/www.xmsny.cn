@@ -2,7 +2,7 @@
 layout: post
 title: terraform管理vmware vsphere问题
 subtitle:   ""
-date: 2020-04-024T11:25:13+08:00
+date: 2020-04-24T11:25:13+08:00
 author: "FangXiangMeng"
 published: true
 tags:
@@ -21,12 +21,12 @@ tags:
 
 ### 遇到问题
 #### 1、创建vapp时报错
-```shell
+```bash
 Error: POST https://192.168.182.62/rest/com/vmware/cis/tagging/tag-association?~action=list-attached-tags: 503 Service Unavailable
 ```
 
 #### 2、克隆虚拟机失败，说是在克隆的时候磁盘类型更改了(实际没有更改，还是使用的thin)。
-```shell
+```bash
 Error: error reconfiguring virtual machine: error processing disk changes post-clone: disk.0: ServerFaultCode: com.vmware.pbm.persistence.exception.PersistenceOperationException: Error occured while getting entry with key 'vm-278:2000' from provider '[Name:spbmAssociationProvider Optimistic locking:false]': RESOURCE (vm-278:2000), ACTION (queryAssociatedProfile): RESOURCE (vm-278), ACTION (PolicyIDByVirtualDisk)
 ```
 
@@ -34,19 +34,19 @@ Error: error reconfiguring virtual machine: error processing disk changes post-c
 1.将vsphere provider版本从v1.17降到1.14.0解决此问题
 
 #### 3、克隆虚拟机报错,选择系统版本有问题。不管选择那个都会报这个错。
-```shell
+```bash
 Error: error sending customization spec: Customization of the guest operating system 'otherLinux64Guest' is not supported in this configuration. Microsoft Vista (TM) and Linux guests with Logical Volume Manager are supported only for recent ESX host and VMware Tools versions. Refer to vCenter documentation for supported configurations.
 ```
 **解决方法：**\
 1、安装VMware tools解决此问题。
 
 参考连接
-```shell
+```bash
 https://everythingshouldbevirtual.com/automation/terraform-vsphere-centos-7-customization-issues/
 ```
 
 #### 4、克隆虚拟机报错
-```shell
+```bash
 Error: Get unexpected status code: 503: call failed: Error response from vCloud Suite API: {"value":{"messages":[{"default_message":"????????¨?","id":"com.vmware.vapi.endpoint.cis.ServiceUnavailable","args":[]}]},"type":"com.vmware.vapi.std.errors.service_unavailable"}
 ```
 > 这个时候实际上虚拟机在vcenter已经创建完成并且启动完成了。
@@ -55,6 +55,6 @@ Error: Get unexpected status code: 503: call failed: Error response from vCloud 
 1、重启vcenter解决此问题。
 
 参考链接
-```shell
+```bash
 https://flings.vmware.com/vsphere-html5-web-client/bugs/197
 ```
