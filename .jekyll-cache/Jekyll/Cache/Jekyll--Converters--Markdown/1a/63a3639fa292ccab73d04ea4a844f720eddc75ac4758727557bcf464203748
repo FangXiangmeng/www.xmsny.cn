@@ -1,0 +1,94 @@
+I"�<h5 id="1今天遇到问题就是harbor登录问题我之前使用的是80端口所以在harborcfg里面不用加端口后面我换成5050端口就登陆不上了">1.今天遇到问题就是harbor登录问题，我之前使用的是80端口，所以在harbor.cfg里面不用加端口，后面我换成5050端口，就登陆不上了。</h5>
+
+<p><strong>解决方法：</strong> <br />
+才发现需要在harbor.cfg里面的hostname后面也要跟上端口</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>如：hostname =  hub.ityy.ultrapower.com.cn:5050
+还需要在/usr/lib/systemd/system/docker.service
+添加：  --insecure-registry=hub.ityy.ultrapower.com.cn:5050 
+</code></pre></div></div>
+
+<h5 id="2harbor升级到17想做镜像复制发现一直新建目标测试连接失败">2.harbor升级到1.7，想做镜像复制发现一直新建目标，测试连接失败。</h5>
+
+<p><strong>排查:</strong> <br />
+最后查看/var/log/harbor/core.log日志发现一下报错</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Mar 29 11:28:13 172.18.0.1 core[22621]: 2019-03-29T03:28:13Z [ERROR] [target.go:65]: failed to ping target: Head http://192.168.193.64:5050/v2/: Get http://hub.ityy.ultrapower.com.cn:5050/service/token?service=harbor-registry: dial tcp: lookup hub.ityy.ultrapower.com.cn on 127.0.0.11:53: no such host
+Mar 29 11:28:13 172.18.0.1 core[22621]: 2019/03/29 03:28:13 #033[1;44m[D] [server.go:2619] | 192.168.26.130|#033[43m 400 #033[0m|  52.464718ms|   match|#033[46m POST    #033[0m /api/targets/ping   r:/api/targets/ping#033[0m
+Mar 29 11:28:31 172.18.0.1 core[22621]: 2019-03-29T03:28:31Z [ERROR] [target.go:65]: failed to ping target: Head http://192.168.193.64:5050/v2/: Get http://hub.ityy.ultrapower.com.cn:5050/service/token?service=harbor-registry: dial tcp: lookup hub.ityy.ultrapower.com.cn on 127.0.0.11:53: no such host
+Mar 29 11:28:31 172.18.0.1 core[22621]: 2019/03/29 03:28:31 #033[1;44m[D] [server.go:2619] | 192.168.26.130|#033[43m 400 #033[0m|  52.327194ms|   match|#033[46m POST    #033[0m /api/targets/ping   r:/api/targets/ping#033[0m
+Mar 29 11:28:32 172.18.0.1 core[22621]: 2019-03-29T03:28:32Z [ERROR] [target.go:65]: failed to ping target: Head http://192.168.193.64:5050/v2/: Get http://hub.ityy.ultrapower.com.cn:5050/service/token?service=harbor-registry: dial tcp: lookup hub.ityy.ultrapower.com.cn on 127.0.0.11:53: no such host
+Mar 29 11:28:32 172.18.0.1 core[22621]: 2019/03/29 03:28:32 #033[1;44m[D] [server.go:2619] | 192.168.26.130|#033[43m 400 #033[0m|  40.945149ms|   match|#033[46m POST    #033[0m /api/targets/ping   r:/api/targets/ping#033[0m
+Mar 29 11:28:32 172.18.0.1 core[22621]: 2019/03/29 03:28:32 #033[1;44m[D] [server.go:2619] |      127.0.0.1|#033[42m 200 #033[0m|    254.132µs|   match|#033[44m GET     #033[0m /api/ping   r:/api/ping#033[0m
+Mar 29 11:28:37 172.18.0.1 core[22621]: 2019-03-29T03:28:37Z [ERROR] [target.go:65]: failed to ping target: Head http://192.168.193.64:5050/v2/: Get http://hub.ityy.ultrapower.com.cn:5050/service/token?service=harbor-registry: dial tcp: lookup hub.ityy.ultrapower.com.cn on 127.0.0.11:53: no such host
+Mar 29 11:28:37 172.18.0.1 core[22621]: 2019/03/29 03:28:37 #033[1;44m[D] [server.go:2619] | 192.168.26.130|#033[43m 400 #033[0m| 5.040628875s|   match|#033[46m POST    #033[0m /api/targets/ping   r:/api/targets/ping#033[0m
+Mar 29 11:29:02 172.18.0.1 core[22621]: 2019/03/29 03:29:02 #033[1;44m[D] [server.go:2619] |      127.0.0.1|#033[42m 200 #033[0m|   3.126786ms|   match|#033[44m GET     #033[0m /api/ping   r:/api/ping#033[0m
+^C
+</code></pre></div></div>
+
+<p><strong>解决：</strong> <br />
+因为在harbor.cfg中使用的是域名登陆。所以解析不到。解决办法就是在docker-compose中给hosts(extra_hosts)，如下：</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>  core:
+    image: goharbor/harbor-core:v1.7.0
+    container_name: harbor-core
+    env_file:
+      - ./common/config/core/env
+    restart: always
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+    volumes:
+      - ./common/config/core/app.conf:/etc/core/app.conf:z
+      - ./common/config/core/private_key.pem:/etc/core/private_key.pem:z
+      - ./common/config/core/certificates/:/etc/core/certificates/:z
+      - /data/secretkey:/etc/core/key:z
+      - /data/ca_download/:/etc/core/ca/:z
+      - /data/psc/:/etc/core/token/:z
+      - /data/:/data/:z
+    networks:
+      - harbor
+    dns_search: .
+    extra_hosts:
+     - "hub.ityy.ultrapower.com.cn:192.168.193.64"
+</code></pre></div></div>
+
+<h4 id="harbor17传输镜像失败">harbor1.7传输镜像失败</h4>
+<p>以下是传输报错输出日志：</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>2019-03-29T08:15:10Z [INFO] initialization completed: repository: test/alpine, tags: [3.6], source registry: URL-http://core:8080 insecure-false, destination registry: URL-http://192.168.193.64:5050 insecure-true
+2019-03-29T08:15:10Z [WARNING] the status code is 409 when creating project test on destination registry, try to do next step
+2019-03-29T08:15:10Z [INFO] manifest of test/alpine:3.6 pulled successfully from source registry: sha256:36c3a913e62f77a82582eb7ce30d255f805c3d1e11d58e1f805e14d33c2bc5a5
+2019-03-29T08:15:10Z [ERROR] [transfer.go:277]: an error occurred while checking existence of blob sha256:43773d1dba76c4d537b494a8454558a41729b92aa2ad0feb23521c3e58cd0440 of test/alpine:3.6 on destination registry: Head http://192.168.193.64:5050/v2/test/alpine/blobs/sha256:43773d1dba76c4d537b494a8454558a41729b92aa2ad0feb23521c3e58cd0440: Get http://hub.ityy.ultrapower.com.cn:5050/service/token?scope=repository%3Atest%2Falpine%3Apull&amp;service=harbor-registry: dial tcp: lookup hub.ityy.ultrapower.com.cn on 127.0.0.11:53: no such host
+</code></pre></div></div>
+
+<p><strong>排查：</strong></p>
+
+<p>查找了harbor所在主机jobservice日志出现一下报错,发现解析不了hub.ityy.ultrapower.com.cn这个域名。</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Mar 29 16:14:00 172.26.0.1 jobservice[22621]: 2019-03-29T08:14:00Z [INFO] manifest of test/alpine:3.6 pulled successfully from source registry: sha256:36c3a913e62f77a82582eb7ce30d255f805c3d1e11d58e1f805e14d33c2bc5a5
+Mar 29 16:14:00 172.26.0.1 jobservice[22621]: 2019-03-29T08:14:00Z [ERROR] [transfer.go:90]: an error occurred while checking existence of blob sha256:43773d1dba76c4d537b494a8454558a41729b92aa2ad0feb23521c3e58cd0440 of test/alpine:3.6 on destination registry: Head http://192.168.193.64:5050/v2/test/alpine/blobs/sha256:43773d1dba76c4d537b494a8454558a41729b92aa2ad0feb23521c3e58cd0440: Get http://hub.ityy.ultrapower.com.cn:5050/service/token?scope=repository%3Atest%2Falpine%3Apull&amp;service=harbor-registry: dial tcp: lookup hub.ityy.ultrapower.com.cn on 127.0.0.11:53: no such host
+Mar 29 16:14:00 172.26.0.1 jobservice[22621]: 2019-03-29T08:14:00Z [ERROR] [redis_job_wrapper.go:70]: Job 'IMAGE_TRANSFER:140cd6cb026c903fa99d9e22' exit with error: Head http://192.168.193.64:5050/v2/test/alpine/blobs/sha256:43773d1dba76c4d537b494a8454558a41729b92aa2ad0feb23521c3e58cd0440: Get http://hub.ityy.ultrapower.com.cn:5050/service/token?scope=repository%3Atest%2Falpine%3Apull&amp;service=harbor-registry: dial tcp: lookup hub.ityy.ultrapower.com.cn on 127.0.0.11:53: no such host
+</code></pre></div></div>
+
+<h5 id="解决方法">解决方法：</h5>
+<p>在jobservice的yml中添加hosts解析：</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>  jobservice:
+    image: goharbor/harbor-jobservice:v1.7.0
+    container_name: harbor-jobservice
+    env_file:
+      - ./common/config/jobservice/env
+    restart: always
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    volumes:
+      - /data/job_logs:/var/log/jobs:z
+      - ./common/config/jobservice/config.yml:/etc/jobservice/config.yml:z
+    networks:
+      - harbor
+    extra_hosts:
+      - "hub.ityy.ultrapower.com.cn:192.168.193.64"
+</code></pre></div></div>
+<p>最终完美复制</p>
+:ET

@@ -1,0 +1,264 @@
+I"]<p><code class="highlighter-rouge">kubeadm</code>是一个kubernetes官方提供的快速安装和初始化拥有最佳实践（best practice）的kubernetes集群的工具，虽然目前还处于 beta 和 alpha 状态，还不能用在生产环境，但是我们可以通过学习这种部署方法来体会一些官方推荐的kubernetes最佳实践的设计和思想。</p>
+
+<!--more-->
+
+<p><code class="highlighter-rouge">kubeadm</code>的目标是提供一个最小可用的可以通过Kubernetes一致性测试的集群，所以并不会安装任何除此之外的非必须的addon。</p>
+
+<p><code class="highlighter-rouge">kubeadm</code>默认情况下并不会安装一个网络解决方案，所以用kubeadm安装完之后 需要自己来安装一个网络的插件。</p>
+
+<h2 id="1安装">1、安装</h2>
+
+<h3 id="11系统环境">1.1、系统环境</h3>
+<ul>
+  <li>Ubuntu16.04+/Debian 9/CentOS 7/RHEL 7/Other.</li>
+  <li>2GB或者以上的RAM(否则将没有足够空间留给app).</li>
+  <li>2核以上CPU.</li>
+  <li>集群的机器之间必须能通过网络互相通信.</li>
+  <li>SWAP必须被关闭，否则kubelet会出错！</li>
+</ul>
+
+<h3 id="12安装前配置">1.2、安装前配置</h3>
+
+<p>关闭selinux</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>setenforce 0
+</code></pre></div></div>
+
+<p>关闭防火墙</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>systemctl stop firewalld
+<span class="nv">$ </span>systemctl disable firewalld
+</code></pre></div></div>
+
+<p>创建/etc/sysctl.d/k8s.conf文件，添加如下内容：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span><span class="nb">cat</span> <span class="o">&lt;&lt;</span><span class="no">EOF</span><span class="sh"> &gt;  /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv4.ip_forward = 1
+</span><span class="no">EOF
+
+</span><span class="nv">$ </span>modprobe br_netfilter
+<span class="nv">$ </span>sysctl <span class="nt">-p</span> /etc/sysctl.d/k8s.conf
+</code></pre></div></div>
+
+<p>安装docker</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span><span class="nb">sudo </span>yum <span class="nb">install</span> <span class="nt">-y</span> docker
+<span class="nv">$ </span><span class="nb">sudo </span>systemctl <span class="nb">enable </span>docker <span class="o">&amp;&amp;</span> <span class="nb">sudo </span>systemctl start docker
+</code></pre></div></div>
+
+<p>下载所需镜像(需要科学上网)：</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>gcr.io/google_containers/etcd-amd64                      3.1.11              52920ad46f5b        4 months ago        193.2 MB
+gcr.io/google_containers/kubernetes-dashboard-amd64      v1.8.3              0c60bcf89900        4 months ago        102.3 MB
+gcr.io/google_containers/kube-apiserver-amd64            v1.9.3              360d55f91cbf        5 months ago        210.5 MB
+gcr.io/google_containers/kube-proxy-amd64                v1.9.3              35fdc6da5fd8        5 months ago        109.1 MB
+gcr.io/google_containers/kube-controller-manager-amd64   v1.9.3              83dbda6ee810        5 months ago        137.8 MB
+gcr.io/google_containers/kube-scheduler-amd64            v1.9.3              d3534b539b76        5 months ago        62.71 MB
+quay.io/coreos/flannel                                   v0.10.0-amd64       f0fad859c909        5 months ago        44.58 MB
+gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64     1.14.8              c2ce1ffb51ed        6 months ago        40.95 MB
+gcr.io/google_containers/k8s-dns-sidecar-amd64           1.14.8              6f7f2dc7fab5        6 months ago        42.21 MB
+gcr.io/google_containers/k8s-dns-kube-dns-amd64          1.14.8              80cc5ea4b547        6 months ago        50.45 MB
+gcr.io/google_containers/pause-amd64                     3.0                 da86e6ba6ca1        6 months ago        742.5 kB
+k8s.gcr.io/pause-amd64                                   3.1                 da86e6ba6ca1        6 months ago        742.5 kB
+gcr.io/google_containers/heapster-influxdb-amd64         v1.3.3              577260d221db        10 months ago       12.55 MB
+gcr.io/google_containers/heapster-grafana-amd64          v4.4.3              8cb3de219af7        10 months ago       151.5 MB
+gcr.io/google_containers/heapster-amd64                  v1.4.2              d4e02f5922ca        10 months ago       73.4 MB
+</code></pre></div></div>
+
+<p>接下来我们需要安装kubeadm, kubelet和kubectl了，我们需要先加一个repo：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">cat</span> <span class="o">&lt;&lt;</span><span class="no">EOF</span><span class="sh"> &gt; /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg
+        https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+</span><span class="no">EOF
+</span></code></pre></div></div>
+
+<p>然后安装(所有节点)：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span><span class="nb">sudo </span>yum <span class="nb">install</span> <span class="nt">-y</span> kubelet kubeadm kubectl kubernetes-cni
+<span class="nv">$ </span><span class="nb">sudo </span>systemctl <span class="nb">enable </span>kubelet <span class="o">&amp;&amp;</span> <span class="nb">sudo </span>systemctl start kubelet
+</code></pre></div></div>
+
+<p>使用kubeadm初始化master
+安装完所有的依赖之后，我们就可以用kubeadm初始化master了。
+我们在初始化的时候指定一下kubernetes版本，并设置一下pod-network-cidr（后面的flannel会用到）：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">[</span>root@caas1 /]# kubeadm init <span class="nt">--kubernetes-version</span><span class="o">=</span>v1.9.3 <span class="nt">--pod-network-cidr</span><span class="o">=</span>10.244.0.0/16 
+<span class="o">[</span>init] Using Kubernetes version: v1.9.3
+<span class="o">[</span>init] Using Authorization modes: <span class="o">[</span>Node RBAC]
+<span class="o">[</span>preflight] Running pre-flight checks.
+	<span class="o">[</span>WARNING FileExisting-crictl]: crictl not found <span class="k">in </span>system path
+<span class="o">[</span>preflight] Starting the kubelet service
+<span class="o">[</span>certificates] Generated ca certificate and key.
+<span class="o">[</span>certificates] Generated apiserver certificate and key.
+<span class="o">[</span>certificates] apiserver serving cert is signed <span class="k">for </span>DNS names <span class="o">[</span>caas1 kubernetes kubernetes.default kubernetes.default.svc kubernetes.default.svc.cluster.local] and IPs <span class="o">[</span>10.96.0.1 192.168.1.103]
+<span class="o">[</span>certificates] Generated apiserver-kubelet-client certificate and key.
+<span class="o">[</span>certificates] Generated sa key and public key.
+<span class="o">[</span>certificates] Generated front-proxy-ca certificate and key.
+<span class="o">[</span>certificates] Generated front-proxy-client certificate and key.
+<span class="o">[</span>certificates] Valid certificates and keys now exist <span class="k">in</span> <span class="s2">"/etc/kubernetes/pki"</span>
+<span class="o">[</span>kubeconfig] Wrote KubeConfig file to disk: <span class="s2">"admin.conf"</span>
+<span class="o">[</span>kubeconfig] Wrote KubeConfig file to disk: <span class="s2">"kubelet.conf"</span>
+<span class="o">[</span>kubeconfig] Wrote KubeConfig file to disk: <span class="s2">"controller-manager.conf"</span>
+<span class="o">[</span>kubeconfig] Wrote KubeConfig file to disk: <span class="s2">"scheduler.conf"</span>
+<span class="o">[</span>controlplane] Wrote Static Pod manifest <span class="k">for </span>component kube-apiserver to <span class="s2">"/etc/kubernetes/manifests/kube-apiserver.yaml"</span>
+<span class="o">[</span>controlplane] Wrote Static Pod manifest <span class="k">for </span>component kube-controller-manager to <span class="s2">"/etc/kubernetes/manifests/kube-controller-manager.yaml"</span>
+<span class="o">[</span>controlplane] Wrote Static Pod manifest <span class="k">for </span>component kube-scheduler to <span class="s2">"/etc/kubernetes/manifests/kube-scheduler.yaml"</span>
+<span class="o">[</span>etcd] Wrote Static Pod manifest <span class="k">for </span>a <span class="nb">local </span>etcd instance to <span class="s2">"/etc/kubernetes/manifests/etcd.yaml"</span>
+<span class="o">[</span>init] Waiting <span class="k">for </span>the kubelet to boot up the control plane as Static Pods from directory <span class="s2">"/etc/kubernetes/manifests"</span><span class="nb">.</span>
+<span class="o">[</span>init] This might take a minute or longer <span class="k">if </span>the control plane images have to be pulled.
+<span class="o">[</span>apiclient] All control plane components are healthy after 31.503276 seconds
+<span class="o">[</span>uploadconfig]?Storing the configuration used <span class="k">in </span>ConfigMap <span class="s2">"kubeadm-config"</span> <span class="k">in </span>the <span class="s2">"kube-system"</span> Namespace
+<span class="o">[</span>markmaster] Will mark node caas1 as master by adding a label and a taint
+<span class="o">[</span>markmaster] Master caas1 tainted and labelled with key/value: node-role.kubernetes.io/master<span class="o">=</span><span class="s2">""</span>
+<span class="o">[</span>bootstraptoken] Using token: 820f6b.4cede061bc4845cf
+<span class="o">[</span>bootstraptoken] Configured RBAC rules to allow Node Bootstrap tokens to post CSRs <span class="k">in </span>order <span class="k">for </span>nodes to get long term certificate credentials
+<span class="o">[</span>bootstraptoken] Configured RBAC rules to allow the csrapprover controller automatically approve CSRs from a Node Bootstrap Token
+<span class="o">[</span>bootstraptoken] Configured RBAC rules to allow certificate rotation <span class="k">for </span>all node client certificates <span class="k">in </span>the cluster
+<span class="o">[</span>bootstraptoken] Creating the <span class="s2">"cluster-info"</span> ConfigMap <span class="k">in </span>the <span class="s2">"kube-public"</span> namespace
+<span class="o">[</span>addons] Applied essential addon: kube-dns
+<span class="o">[</span>addons] Applied essential addon: kube-proxy
+
+Your Kubernetes master has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+  <span class="nb">mkdir</span> <span class="nt">-p</span> <span class="nv">$HOME</span>/.kube
+  <span class="nb">sudo cp</span> <span class="nt">-i</span> /etc/kubernetes/admin.conf <span class="nv">$HOME</span>/.kube/config
+  <span class="nb">sudo chown</span> <span class="si">$(</span><span class="nb">id</span> <span class="nt">-u</span><span class="si">)</span>:<span class="si">$(</span><span class="nb">id</span> <span class="nt">-g</span><span class="si">)</span> <span class="nv">$HOME</span>/.kube/config
+
+You should now deploy a pod network to the cluster.
+Run <span class="s2">"kubectl apply -f [podnetwork].yaml"</span> with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+You can now <span class="nb">join </span>any number of machines by running the following on each node
+as root:
+
+  kubeadm <span class="nb">join</span> <span class="nt">--token</span> 820f6b.4cede061bc4845cf 192.168.1.103:6443 <span class="nt">--discovery-token-ca-cert-hash</span> sha256:5aa6357262e9b2f173dc2c2f0dca5f17a1212ad06049a14e8d61ac442130211f
+</code></pre></div></div>
+<p>最下面的这行kubeadm join什么的，就是用来让别的node加入集群的，可以看出非常方便。我们要保存好这一行东西，这是我们之后让node加入集群的凭据，一会儿会用到。</p>
+
+<p>这个时候，我们还不能通过kubectl来控制集群，要让kubectl可用，我们需要做：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># 对于非root用户</span>
+<span class="nv">$ </span><span class="nb">mkdir</span> <span class="nt">-p</span> <span class="nv">$HOME</span>/.kube
+<span class="nv">$ </span><span class="nb">sudo cp</span> <span class="nt">-i</span> /etc/kubernetes/admin.conf <span class="nv">$HOME</span>/.kube/config
+<span class="nv">$ </span><span class="nb">sudo chown</span> <span class="si">$(</span><span class="nb">id</span> <span class="nt">-u</span><span class="si">)</span>:<span class="si">$(</span><span class="nb">id</span> <span class="nt">-g</span><span class="si">)</span> <span class="nv">$HOME</span>/.kube/config
+
+<span class="c"># 对于root用户</span>
+<span class="nv">$ </span><span class="nb">export </span><span class="nv">KUBECONFIG</span><span class="o">=</span>/etc/kubernetes/admin.conf
+<span class="c"># 也可以直接放到~/.bash_profile</span>
+<span class="nv">$ </span><span class="nb">echo</span> <span class="s2">"export KUBECONFIG=/etc/kubernetes/admin.conf"</span> <span class="o">&gt;&gt;</span> ~/.bash_profile
+</code></pre></div></div>
+
+<p>查看集群状态</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[root@caas1 flanneld]# kubectl get cs
+NAME                 STATUS    MESSAGE              ERROR
+controller-manager   Healthy   ok                   
+scheduler            Healthy   ok                   
+etcd-0               Healthy   {"health": "true"} 
+</code></pre></div></div>
+
+<p>接下来要注意，我们必须自己来安装一个network addon。</p>
+
+<p>network addon必须在任何app部署之前安装好。同样的，kube-dns也会在network addon安装好之后才启动。kubeadm只支持CNI-based networks（不支持kubenet）。</p>
+
+<p>比较常见的network addon有：
+Calico, Canal, Flannel, Kube-router, Romana, Weave Net等。这里我们使用Flannel。</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl apply <span class="nt">-f</span> https://raw.githubusercontent.com/coreos/flannel/v0.10.0/Documentation/kube-flannel.yml
+</code></pre></div></div>
+
+<p>安装完network之后，你可以通过kubectl get pods –all-namespaces来查看kube-dns是否在running来判断network是否安装成功。</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">[</span>root@caas1 kubernetes]# kubectl get pod <span class="nt">--all-namespaces</span>
+NAMESPACE     NAME                            READY     STATUS    RESTARTS   AGE
+kube-system   etcd-caas1                      1/1       Running   0          1h
+kube-system   kube-apiserver-caas1            1/1       Running   0          1h
+kube-system   kube-controller-manager-caas1   1/1       Running   0          1h
+kube-system   kube-dns-6f4fd4bdf-gwf68        3/3       Running   0          2m
+kube-system   kube-flannel-ds-r8ttz           1/1       Running   0          23m
+kube-system   kube-proxy-nkxgc                1/1       Running   0          1h
+kube-system   kube-scheduler-caas1            1/1       Running   0          1h
+</code></pre></div></div>
+
+<p>默认情况下，为了保证master的安全，master是不会被调度到app的。你可以取消这个限制通过输入：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>kubectl taint nodes <span class="nt">--all</span> node-role.kubernetes.io/master-
+</code></pre></div></div>
+<p>终于部署完了我们的master！</p>
+
+<h3 id="13加入nodes">1.3、加入nodes</h3>
+
+<p>现在我们开始加入一些node到我们的集群里面吧！</p>
+
+<p>到我们的node节点上，执行刚才下面给出的那个 kubeadm join的命令（每个人不同）：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code> <span class="o">[</span>root@caas2 rpm]# kubeadm <span class="nb">join</span> <span class="nt">--token</span> 820f6b.4cede061bc4845cf 192.168.1.103:6443 <span class="nt">--discovery-token-ca-cert-hash</span> sha256:5aa6357262e9b2f173dc2c2f0dca5f17a1212ad06049a14e8d61ac442130211f
+<span class="o">[</span>preflight] Running pre-flight checks.
+	<span class="o">[</span>WARNING FileExisting-crictl]: crictl not found <span class="k">in </span>system path
+<span class="o">[</span>preflight] Starting the kubelet service
+<span class="o">[</span>discovery] Trying to connect to API Server <span class="s2">"192.168.1.103:6443"</span>
+<span class="o">[</span>discovery] Created cluster-info discovery client, requesting info from <span class="s2">"https://192.168.1.103:6443"</span>
+<span class="o">[</span>discovery] Requesting info from <span class="s2">"https://192.168.1.103:6443"</span> again to validate TLS against the pinned public key
+<span class="o">[</span>discovery] Cluster info signature and contents are valid and TLS certificate validates against pinned roots, will use API Server <span class="s2">"192.168.1.103:6443"</span>
+<span class="o">[</span>discovery] Successfully established connection with API Server <span class="s2">"192.168.1.103:6443"</span>
+
+This node has joined the cluster:
+<span class="k">*</span> Certificate signing request was sent to master and a response
+  was received.
+<span class="k">*</span> The Kubelet was informed of the new secure connection details.
+
+Run <span class="s1">'kubectl get nodes'</span> on the master to see this node <span class="nb">join </span>the cluster.
+</code></pre></div></div>
+
+<p>这时候，我们去master上输入kubectl get nodes查看一下：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">[</span>root@caas1 images]# kubectl get nodes
+NAME      STATUS    ROLES     AGE       VERSION
+caas1     Ready     master    1h        v1.9.3
+caas2     Ready     &lt;none&gt;    6m        v1.9.3
+</code></pre></div></div>
+<h3 id="遇到问题">遇到问题</h3>
+<p>kubelet:</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubelet: E0710 10:55:50.829239   63543 summary.go:92] Failed to get system container stats <span class="k">for</span> <span class="s2">"/system.slice/docker.service"</span>: failed to get cgroup stats <span class="k">for</span> <span class="s2">"/system.slice/docker.service"</span>: failed to get container info <span class="k">for</span> <span class="s2">"/system.slice/docker.service"</span>: unknown container <span class="s2">"/system.slice/docker.service"</span>
+</code></pre></div></div>
+<p>解决方法：添加<code class="highlighter-rouge">--runtime-cgroups=/systemd/system.slice --kubelet-cgroups=/systemd/system.slice</code></p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">[</span>root@caas2 /]# vim /etc/systemd/system/kubelet.service.d/10-kubeadm.conf 
+<span class="o">[</span>Service]
+<span class="nv">Environment</span><span class="o">=</span><span class="s2">"KUBELET_KUBECONFIG_ARGS=--bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf"</span>
+<span class="nv">Environment</span><span class="o">=</span><span class="s2">"KUBELET_SYSTEM_PODS_ARGS=--pod-manifest-path=/etc/kubernetes/manifests --allow-privileged=true"</span>
+<span class="nv">Environment</span><span class="o">=</span><span class="s2">"KUBELET_NETWORK_ARGS=--network-plugin=cni --cni-conf-dir=/etc/cni/net.d --cni-bin-dir=/opt/cni/bin"</span>
+<span class="nv">Environment</span><span class="o">=</span><span class="s2">"KUBELET_DNS_ARGS=--cluster-dns=10.96.0.10 --cluster-domain=cluster.local"</span>
+<span class="nv">Environment</span><span class="o">=</span><span class="s2">"KUBELET_AUTHZ_ARGS=--authorization-mode=Webhook --client-ca-file=/etc/kubernetes/pki/ca.crt"</span>
+<span class="nv">Environment</span><span class="o">=</span><span class="s2">"KUBELET_CADVISOR_ARGS=--cadvisor-port=0"</span>
+<span class="nv">Environment</span><span class="o">=</span><span class="s2">"KUBELET_CGROUP_ARGS=--cgroup-driver=systemd --runtime-cgroups=/systemd/system.slice --kubelet-cgroups=/systemd/system.slice"</span>
+<span class="nv">Environment</span><span class="o">=</span><span class="s2">"KUBELET_CERTIFICATE_ARGS=--rotate-certificates=true --cert-dir=/var/lib/kubelet/pki"</span>
+<span class="nv">ExecStart</span><span class="o">=</span>
+<span class="nv">ExecStart</span><span class="o">=</span>/usr/bin/kubelet <span class="nv">$KUBELET_KUBECONFIG_ARGS</span> <span class="nv">$KUBELET_SYSTEM_PODS_ARGS</span> <span class="nv">$KUBELET_NETWORK_ARGS</span> <span class="nv">$KUBELET_DNS_ARGS</span> <span class="nv">$KUBELET_AUTHZ_ARGS</span> <span class="nv">$KUBELET_CADVISOR_ARGS</span> <span class="nv">$KUBELET_CGROUP_ARGS</span> <span class="nv">$KUBELET_CERTIFICATE_ARGS</span> <span class="nv">$KUBELET_EXTRA_ARGS</span>
+</code></pre></div></div>
+<p>然后重启</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>systemctl daemon-reload <span class="o">&amp;&amp;</span> systemctl restart kubelet
+</code></pre></div></div>
+
+<h3 id="清空环境">清空环境</h3>
+<p>集群初始化如果遇到问题，可以使用下面的命令进行清理：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubeadm reset
+ifconfig cni0 down
+ip <span class="nb">link </span>delete cni0
+ifconfig flannel.1 down
+ip <span class="nb">link </span>delete flannel.1
+<span class="nb">rm</span> <span class="nt">-rf</span> /var/lib/cni/
+</code></pre></div></div>
+<h3 id="pod-network使用cni">Pod Network(使用CNI)</h3>
+<p>如果Node有多个网卡的话，目前需要在kube-flannel.yml中使用–iface参数指定集群主机内网网卡的名称，否则可能会出现dns无法解析。需要将kube-flannel.yml下载到本地，flanneld启动参数加上–iface=<iface-name></iface-name></p>
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">containers</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">kube-flannel</span>
+        <span class="na">image</span><span class="pi">:</span> <span class="s">quay.io/coreos/flannel:v0.9.1-amd64</span>
+        <span class="na">command</span><span class="pi">:</span>
+        <span class="pi">-</span> <span class="s">/opt/bin/flanneld</span>
+        <span class="na">args</span><span class="pi">:</span>
+        <span class="pi">-</span> <span class="s">--ip-masq</span>
+        <span class="pi">-</span> <span class="s">--kube-subnet-mgr</span>
+        <span class="pi">-</span> <span class="s">--iface=ens160</span>
+</code></pre></div></div>
+<h3 id="如何从集群中移除node">如何从集群中移除Node</h3>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl drain node2 <span class="nt">--delete-local-data</span> <span class="nt">--force</span> <span class="nt">--ignore-daemonsets</span>
+kubectl delete node node2
+</code></pre></div></div>
+:ET

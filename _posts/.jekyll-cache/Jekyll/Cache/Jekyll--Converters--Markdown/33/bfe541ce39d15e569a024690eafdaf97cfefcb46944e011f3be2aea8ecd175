@@ -1,0 +1,132 @@
+I"�?<p>OverlayFS是一个现代的联合文件系统，类似于AUFS，但速度更快，实现更简单。Docker为OverlayFS提供了两个存储驱动程序：原始版本overlay，更新版本更稳定overlay2
+<!--more--></p>
+
+<blockquote>
+  <p>注意：如果使用OverlayFS，请使用overlay2驱动程序而不是 overlay驱动程序，因为它在inode利用率方面更有效。要使用新驱动程序，需要使用版本4.0或更高版本的Linux内核，或使用版本3.10.0-514及更高版本的RHEL或CentOS。 \</p>
+</blockquote>
+
+<h2 id="先决条件">先决条件</h2>
+<p><strong>如果满足以下先决条件，则支持OverlayFS:</strong></p>
+
+<ul>
+  <li>overlay2 Docker EE 17.06.02-ee5及更高版本支持该驱动程序，并推荐用于Docker CE。</li>
+  <li>overlay 允许使用驱动程序但不建议使用Docker CE。</li>
+  <li>Linux内核的4.0或更高版本，或使用内核版本3.10.0-514或更高版本的RHEL或CentOS。</li>
+</ul>
+
+<p><strong>支持以下后备文件系统:</strong></p>
+
+<ul>
+  <li>ext4 （仅限RHEL 7.1）</li>
+  <li>xfs（RHEL 7.2及更高版本），但仅d_type=true启用。使用 <code class="highlighter-rouge">xfs_info</code>验证ftype选项设置为1。要xfs正确格式化 文件系统，请使用该标志<code class="highlighter-rouge">-n ftype=1</code>。</li>
+</ul>
+
+<blockquote>
+  <p>警告：现在在没有d_type支持的XFS上运行会导致Docker跳过尝试使用overlay或overlay2驱动程序。而默认使用devicemapper，现有安装将继续运行，但会产生错误。这是为了允许用户迁移他们的数据。在将来的版本中，这将是一个致命的错误，这将阻止Docker启动。 \</p>
+</blockquote>
+
+<h2 id="使用overlay2存储驱动程序配置docker">使用overlay2存储驱动程序配置Docker</h2>
+<blockquote>
+  <p>注：更改存储驱动程序会使本地系统上的现有容器和镜像无法使用。使用docker save保存你已经建立的任何图像或他们推到你的私有仓库。</p>
+</blockquote>
+
+<p>1.停止docker</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>systemctl stop docker
+</code></pre></div></div>
+
+<p>2.将之前docker数据备份</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span><span class="nb">cp</span> <span class="nt">-au</span> /var/lib/docker /var/lib/docker.bk
+</code></pre></div></div>
+
+<p>3.编辑/etc/docker/daemon.json。如果它尚不存在，请创建它。</p>
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"storage-driver"</span><span class="p">:</span><span class="w"> </span><span class="s2">"overlay2"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"storage-opts"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+    </span><span class="s2">"overlay2.override_kernel_check=true"</span><span class="w">
+  </span><span class="p">]</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+<blockquote>
+  <p>overlay2.override_kernel_check: 禁用对Linux内核4.0或更高版本的检查。</p>
+</blockquote>
+
+<p>4.启动docker</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>systemctl start docker
+</code></pre></div></div>
+
+<p>5.验证是否更改过来</p>
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="err">$</span><span class="w"> </span><span class="err">docker</span><span class="w"> </span><span class="err">info</span><span class="w">
+</span><span class="err">Containers:</span><span class="w"> </span><span class="mi">0</span><span class="w">
+ </span><span class="err">Running:</span><span class="w"> </span><span class="mi">0</span><span class="w">
+ </span><span class="err">Paused:</span><span class="w"> </span><span class="mi">0</span><span class="w">
+ </span><span class="err">Stopped:</span><span class="w"> </span><span class="mi">0</span><span class="w">
+</span><span class="err">Images:</span><span class="w"> </span><span class="mi">0</span><span class="w">
+</span><span class="err">Server</span><span class="w"> </span><span class="err">Version:</span><span class="w"> </span><span class="mf">18.09</span><span class="err">.</span><span class="mi">2</span><span class="w">
+</span><span class="err">Storage</span><span class="w"> </span><span class="err">Driver:</span><span class="w"> </span><span class="err">overlay</span><span class="mi">2</span><span class="w">
+ </span><span class="err">Backing</span><span class="w"> </span><span class="err">Filesystem:</span><span class="w"> </span><span class="err">xfs</span><span class="w">
+ </span><span class="err">Supports</span><span class="w"> </span><span class="err">d_type:</span><span class="w"> </span><span class="kc">true</span><span class="w">
+ </span><span class="err">Native</span><span class="w"> </span><span class="err">Overlay</span><span class="w"> </span><span class="err">Diff:</span><span class="w"> </span><span class="kc">false</span><span class="w">
+</span><span class="err">Logging</span><span class="w"> </span><span class="err">Driver:</span><span class="w"> </span><span class="err">json-file</span><span class="w">
+</span><span class="err">Cgroup</span><span class="w"> </span><span class="err">Driver:</span><span class="w"> </span><span class="err">cgroupfs</span><span class="w">
+</span><span class="err">Plugins:</span><span class="w">
+ </span><span class="err">Volume:</span><span class="w"> </span><span class="err">local</span><span class="w">
+ </span><span class="err">Network:</span><span class="w"> </span><span class="err">bridge</span><span class="w"> </span><span class="err">host</span><span class="w"> </span><span class="err">macvlan</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="err">overlay</span><span class="w">
+ </span><span class="err">Log:</span><span class="w"> </span><span class="err">awslogs</span><span class="w"> </span><span class="err">fluentd</span><span class="w"> </span><span class="err">gcplogs</span><span class="w"> </span><span class="err">gelf</span><span class="w"> </span><span class="err">journald</span><span class="w"> </span><span class="err">json-file</span><span class="w"> </span><span class="err">local</span><span class="w"> </span><span class="err">logentries</span><span class="w"> </span><span class="err">splunk</span><span class="w"> </span><span class="err">syslog</span><span class="w">
+</span><span class="err">Swarm:</span><span class="w"> </span><span class="err">inactive</span><span class="w">
+</span><span class="err">Runtimes:</span><span class="w"> </span><span class="err">runc</span><span class="w">
+</span><span class="err">Default</span><span class="w"> </span><span class="err">Runtime:</span><span class="w"> </span><span class="err">runc</span><span class="w">
+</span><span class="err">Init</span><span class="w"> </span><span class="err">Binary:</span><span class="w"> </span><span class="err">docker-init</span><span class="w">
+</span><span class="err">containerd</span><span class="w"> </span><span class="err">version:</span><span class="w"> </span><span class="err">e</span><span class="mi">6</span><span class="err">b</span><span class="mi">3</span><span class="err">f</span><span class="mi">5632</span><span class="err">f</span><span class="mi">50</span><span class="err">dbc</span><span class="mi">4e9</span><span class="err">cb</span><span class="mi">6288</span><span class="err">d</span><span class="mi">911</span><span class="err">bf</span><span class="mi">4</span><span class="err">f</span><span class="mi">5e95</span><span class="err">b</span><span class="mi">18</span><span class="err">e</span><span class="w">
+</span><span class="err">runc</span><span class="w"> </span><span class="err">version:</span><span class="w"> </span><span class="mi">6635</span><span class="err">b</span><span class="mi">4</span><span class="err">f</span><span class="mi">0</span><span class="err">c</span><span class="mi">6</span><span class="err">af</span><span class="mi">3810594</span><span class="err">d</span><span class="mi">2770</span><span class="err">f</span><span class="mi">662</span><span class="err">f</span><span class="mi">34</span><span class="err">ddc</span><span class="mi">15</span><span class="err">b</span><span class="mi">40</span><span class="err">d</span><span class="w">
+</span><span class="err">init</span><span class="w"> </span><span class="err">version:</span><span class="w"> </span><span class="err">fec</span><span class="mi">3683</span><span class="w">
+</span><span class="err">Security</span><span class="w"> </span><span class="err">Options:</span><span class="w">
+ </span><span class="err">seccomp</span><span class="w">
+  </span><span class="err">Profile:</span><span class="w"> </span><span class="err">default</span><span class="w">
+</span><span class="err">Kernel</span><span class="w"> </span><span class="err">Version:</span><span class="w"> </span><span class="mf">3.10</span><span class="err">.</span><span class="mi">0-514</span><span class="err">.el</span><span class="mi">7</span><span class="err">.x</span><span class="mi">86</span><span class="err">_</span><span class="mi">64</span><span class="w">
+</span><span class="err">Operating</span><span class="w"> </span><span class="err">System:</span><span class="w"> </span><span class="err">CentOS</span><span class="w"> </span><span class="err">Linux</span><span class="w"> </span><span class="mi">7</span><span class="w"> </span><span class="err">(Core)</span><span class="w">
+</span><span class="err">OSType:</span><span class="w"> </span><span class="err">linux</span><span class="w">
+</span><span class="err">Architecture:</span><span class="w"> </span><span class="err">x</span><span class="mi">86</span><span class="err">_</span><span class="mi">64</span><span class="w">
+</span><span class="err">CPUs:</span><span class="w"> </span><span class="mi">2</span><span class="w">
+</span><span class="err">Total</span><span class="w"> </span><span class="err">Memory:</span><span class="w"> </span><span class="mf">976.5</span><span class="err">MiB</span><span class="w">
+</span><span class="err">Name:</span><span class="w"> </span><span class="err">localhost.localdomain</span><span class="w">
+</span><span class="err">ID:</span><span class="w"> </span><span class="err">Q</span><span class="mi">3</span><span class="err">C</span><span class="mi">3</span><span class="err">:HY</span><span class="mi">5</span><span class="err">D:PEBS:UASF:WRAF:TG</span><span class="mi">4</span><span class="err">O:DDWW:FKVY:CNIS:O</span><span class="mi">242</span><span class="err">:LWS</span><span class="mi">3</span><span class="err">:ILDU</span><span class="w">
+</span><span class="err">Docker</span><span class="w"> </span><span class="err">Root</span><span class="w"> </span><span class="err">Dir:</span><span class="w"> </span><span class="err">/var/lib/docker</span><span class="w">
+</span><span class="err">Debug</span><span class="w"> </span><span class="err">Mode</span><span class="w"> </span><span class="err">(client):</span><span class="w"> </span><span class="kc">false</span><span class="w">
+</span><span class="err">Debug</span><span class="w"> </span><span class="err">Mode</span><span class="w"> </span><span class="err">(server):</span><span class="w"> </span><span class="kc">false</span><span class="w">
+</span><span class="err">Registry:</span><span class="w"> </span><span class="err">https://index.docker.io/v</span><span class="mi">1</span><span class="err">/</span><span class="w">
+</span><span class="err">Labels:</span><span class="w">
+</span><span class="err">Experimental:</span><span class="w"> </span><span class="kc">false</span><span class="w">
+</span><span class="err">Insecure</span><span class="w"> </span><span class="err">Registries:</span><span class="w">
+ </span><span class="mf">127.0</span><span class="err">.</span><span class="mf">0.0</span><span class="err">/</span><span class="mi">8</span><span class="w">
+</span><span class="err">Live</span><span class="w"> </span><span class="err">Restore</span><span class="w"> </span><span class="err">Enabled:</span><span class="w"> </span><span class="kc">false</span><span class="w">
+</span><span class="err">Product</span><span class="w"> </span><span class="err">License:</span><span class="w"> </span><span class="err">Community</span><span class="w"> </span><span class="err">Engine</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="遇到问题-">遇到问题 \</h2>
+<p>1.在Centos7.2操作系统做升级时，默认的<code class="highlighter-rouge">ftype</code>没开启，需要重新格式化磁盘。</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>mkfs.xfs <span class="nt">-n</span> <span class="nv">ftype</span><span class="o">=</span>1 /path/to/your/device
+<span class="nv">$ </span> xfs_info /
+meta-data<span class="o">=</span>/dev/mapper/cl-root    <span class="nv">isize</span><span class="o">=</span>512    <span class="nv">agcount</span><span class="o">=</span>4, <span class="nv">agsize</span><span class="o">=</span>3079680 blks
+         <span class="o">=</span>                       <span class="nv">sectsz</span><span class="o">=</span>512   <span class="nv">attr</span><span class="o">=</span>2, <span class="nv">projid32bit</span><span class="o">=</span>1
+         <span class="o">=</span>                       <span class="nv">crc</span><span class="o">=</span>1        <span class="nv">finobt</span><span class="o">=</span>0 <span class="nv">spinodes</span><span class="o">=</span>0
+data     <span class="o">=</span>                       <span class="nv">bsize</span><span class="o">=</span>4096   <span class="nv">blocks</span><span class="o">=</span>12318720, <span class="nv">imaxpct</span><span class="o">=</span>25
+         <span class="o">=</span>                       <span class="nv">sunit</span><span class="o">=</span>0      <span class="nv">swidth</span><span class="o">=</span>0 blks
+naming   <span class="o">=</span>version 2              <span class="nv">bsize</span><span class="o">=</span>4096   ascii-ci<span class="o">=</span>0 <span class="nv">ftype</span><span class="o">=</span>1
+log      <span class="o">=</span>internal               <span class="nv">bsize</span><span class="o">=</span>4096   <span class="nv">blocks</span><span class="o">=</span>6015, <span class="nv">version</span><span class="o">=</span>2
+         <span class="o">=</span>                       <span class="nv">sectsz</span><span class="o">=</span>512   <span class="nv">sunit</span><span class="o">=</span>0 blks, lazy-count<span class="o">=</span>1
+realtime <span class="o">=</span>none                   <span class="nv">extsz</span><span class="o">=</span>4096   <span class="nv">blocks</span><span class="o">=</span>0, <span class="nv">rtextents</span><span class="o">=</span>0
+
+ftype为1时代表开启，0为关闭
+</code></pre></div></div>
+
+<p>2.如果ftype没开启的情况下启动Docker会失败</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dockerd: Error starting daemon: error initializing graphdriver: overlay2: the backing xfs filesystem is formatted without d_type support, which leads to incorrect behavior. Reformat the filesystem with <span class="nv">ftype</span><span class="o">=</span>1 to <span class="nb">enable </span>d_type support. Backing filesystems without d_type support are not supported.
+</code></pre></div></div>
+<p><strong>解决方法:</strong></p>
+
+<p>1.备份数据，格式化文件系统</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>mkfs.xfs <span class="nt">-n</span> <span class="nv">ftype</span><span class="o">=</span>1 /path/to/your/device
+</code></pre></div></div>
+
+<p>2.换回devicemapper存储驱动</p>
+:ET

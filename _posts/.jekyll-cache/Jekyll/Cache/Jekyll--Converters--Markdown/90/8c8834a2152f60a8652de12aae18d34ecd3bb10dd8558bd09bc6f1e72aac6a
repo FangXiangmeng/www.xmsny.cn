@@ -1,0 +1,75 @@
+I"<!--more-->
+<p>Golang简单高效，而且可以很方便的编写web服务，因此在微服务领域非常受欢迎。而我也非常喜欢这门语言，第一次通过docker部署服务就很自然的选择了golang编写的hello world服务。</p>
+
+<h3 id="1-编写golang--hello-world服务">1. 编写Golang  Hello World服务</h3>
+<p>hello world是每个程序员都熟知的程序了，这里所说的hello world服务其实就是用golang编写http服务，接受请求并在响应中返回hello world字符，下面是代码：</p>
+<div class="language-go highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c">// httpHello.go</span>
+<span class="k">package</span> <span class="n">main</span>
+<span class="k">import</span> <span class="p">(</span>
+	<span class="s">"net/http"</span>
+<span class="p">)</span>
+
+<span class="k">func</span> <span class="n">main</span><span class="p">()</span>  <span class="p">{</span>
+	<span class="n">http</span><span class="o">.</span><span class="n">HandleFunc</span><span class="p">(</span><span class="s">"/"</span><span class="p">,</span> <span class="k">func</span><span class="p">(</span><span class="n">res</span> <span class="n">http</span><span class="o">.</span><span class="n">ResponseWriter</span><span class="p">,</span> <span class="n">req</span> <span class="o">*</span><span class="n">http</span><span class="o">.</span><span class="n">Request</span><span class="p">)</span> <span class="p">{</span>
+		<span class="n">res</span><span class="o">.</span><span class="n">Write</span><span class="p">(</span><span class="s">"hello world!"</span><span class="p">)</span>
+	<span class="p">})</span>
+	<span class="n">http</span><span class="o">.</span><span class="n">ListenAndServe</span><span class="p">(</span><span class="s">":8080"</span><span class="p">,</span> <span class="no">nil</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p>使用<code class="highlighter-rouge">go run httpHello.go</code>运行上面的程序，然后用浏览器访问localhost:8080就可以看到”hello world!”字符，这样就编写了一个极为简单的Hello World服务。</p>
+
+<h3 id="2-编写dockerfile">2. 编写Dockerfile</h3>
+<p>有了Hello World服务的程序，就可以使用Dockerfile创建镜像来运行了。通过Dockerfile可以非常简单的从一个基础镜像构建所需要的镜像。</p>
+
+<ul>
+  <li>在程序所在目录创建Dockerfile文件</li>
+  <li>通过From定义基础容器，运行go程序的话需要填写From golang</li>
+  <li>通过ADD将程序引入docker镜像：<code class="highlighter-rouge">ADD httpHello.go /</code>表示将httpHello.go引入到镜像的根目录下</li>
+  <li>通过EXPOSE指定从镜像启动的容器需要监听的端口：因为程序监听了8080端口，所以设置为<code class="highlighter-rouge">EXPOSE 8080</code></li>
+  <li>指定CMD指定容器启动时执行的名令：<code class="highlighter-rouge">CMD ["go", "run", "/httpHello.go"]</code>表示在容器启动时值执行<code class="highlighter-rouge">go run /httpHello.go</code>来运行已经包含在根目录中的程序。
+下面是完整的Dockerfile文件</li>
+</ul>
+
+<div class="language-dockerfile highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">FROM</span><span class="s"> golang</span>
+<span class="k">ADD</span><span class="s"> httpHello.go /</span>
+
+<span class="k">EXPOSE</span><span class="s"> 8080</span>
+<span class="k">CMD</span><span class="s"> ["go", "run", "/httpHello.go"]</span>
+</code></pre></div></div>
+<h3 id="3-构建镜像并从镜像启动docker容器">3. 构建镜像并从镜像启动docker容器</h3>
+<p>有了Dockerfile就可以构建docker镜像了，通过docker镜像则可以启动docker容器</p>
+
+<h4 id="31-构建镜像">3.1 构建镜像</h4>
+<p>命令行进入到Dockerfile所在目录，执行<code class="highlighter-rouge">docker build .</code>成功后会有如下输出：</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Sending build context to Docker daemon  3.072kB
+Step 1/4 : FROM golang
+latest: Pulling from library/golang
+0bd44ff9c2cf: Pull <span class="nb">complete
+</span>047670ddbd2a: Pull <span class="nb">complete
+</span>ea7d5dc89438: Pull <span class="nb">complete
+</span>ae7ad5906a75: Pull <span class="nb">complete
+</span>15f6351ddb37: Pull <span class="nb">complete
+</span>823ef4e8c9c9: Pull <span class="nb">complete
+</span>dca1089cfb86: Pull <span class="nb">complete
+</span>Digest: sha256:3b70f4747eb2c74ddf517b548c4ca8071a0c0b8b9c4ef5933e9a98372e03390f
+Status: Downloaded newer image <span class="k">for </span>golang:latest
+ <span class="nt">---</span><span class="o">&gt;</span> 4e611157870f
+Step 2/4 : ADD httpHello.go /
+ <span class="nt">---</span><span class="o">&gt;</span> e9cb475ff8bd
+Step 3/4 : EXPOSE 8080
+ <span class="nt">---</span><span class="o">&gt;</span> Running <span class="k">in </span>8bb9f8cd5af8
+Removing intermediate container 8bb9f8cd5af8
+ <span class="nt">---</span><span class="o">&gt;</span> 99f651e71bc2
+Step 4/4 : CMD <span class="o">[</span><span class="s2">"go"</span>, <span class="s2">"run"</span>, <span class="s2">"/httpHello.go"</span><span class="o">]</span>
+ <span class="nt">---</span><span class="o">&gt;</span> Running <span class="k">in </span>dc525b84a581
+Removing intermediate container dc525b84a581
+ <span class="nt">---</span><span class="o">&gt;</span> 654b2f885150
+Successfully built 654b2f885150
+</code></pre></div></div>
+<h4 id="32-启动容器">3.2 启动容器</h4>
+<p>从上一步的输出的最后一行中我们可以的得到镜像的id，即”654b2f885150”，然后就可以通过<code class="highlighter-rouge">docker run</code>从这个镜像启动容器了。为了从宿主机访问容器监听的的8080，需要将容器的8080端口映射到宿主机的容器中，所以需要指定参数-p 8080:8080将容器的8080映射到宿主机的8080端口。还可以通过–name参数指定容器的唯一名字，最后再通过镜像的id指定镜像，就可以启动一个docker容器了，完整命令如下：</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>docker run <span class="nt">-p</span> 8080:8080 <span class="nt">--name</span> httpHello 654b2f885150
+</code></pre></div></div>
+:ET

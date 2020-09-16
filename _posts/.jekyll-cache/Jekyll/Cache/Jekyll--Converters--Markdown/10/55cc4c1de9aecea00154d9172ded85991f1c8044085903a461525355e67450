@@ -1,0 +1,145 @@
+I"$*<h2 id="harbor-api">Harbor api</h2>
+
+<h4 id="项目管理">项目管理</h4>
+
+<h6 id="查看仓库中的项目详细信息">查看仓库中的项目详细信息</h6>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>curl <span class="nt">-k</span> <span class="nt">-u</span> <span class="s2">"admin:Harbor12345"</span> <span class="nt">-X</span> GET <span class="nt">-H</span> <span class="s2">"Content-Type: application/json"</span> <span class="s2">"https://HostName/api/projects/{project_id}"</span>
+
+<span class="nv">$ </span>curl <span class="nt">-k</span> <span class="nt">-u</span> <span class="s2">"admin:Harbor12345"</span> <span class="nt">-X</span> GET <span class="nt">-H</span> <span class="s2">"Content-Type: application/json"</span> <span class="s2">"https://HostName/api/projects?project_name=library"</span>
+</code></pre></div></div>
+
+<h6 id="搜索镜像">搜索镜像</h6>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>curl  <span class="nt">-u</span> <span class="s2">"admin:Harbor12345"</span>  <span class="nt">-X</span> GET <span class="nt">-H</span> <span class="s2">"Content-Type: application/json"</span> <span class="s2">"https://HostName/api/search?q=library"</span>
+</code></pre></div></div>
+
+<h6 id="删除项目">删除项目</h6>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>curl  <span class="nt">-u</span> <span class="s2">"admin:Harbor12345"</span>  <span class="nt">-X</span> DELETE  <span class="nt">-H</span> <span class="s2">"Content-Type: application/json"</span> <span class="s2">"https://HostName/api/projects/{project_id}"</span>
+</code></pre></div></div>
+
+<h6 id="创建项目">创建项目</h6>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>curl <span class="nt">-u</span> <span class="s2">"admin:Harbor12345"</span> <span class="nt">-X</span> POST <span class="nt">-H</span> <span class="s2">"Content-Type: application/json"</span> <span class="s2">"https://HostName/api/projects"</span> <span class="nt">-d</span> @createproject.json
+<span class="c"># cat  createproject.json</span>
+<span class="o">{</span>
+<span class="s2">"project_name"</span>: <span class="s2">"testrpo"</span>,
+<span class="s2">"public"</span>: 0
+<span class="o">}</span>
+或者
+<span class="nv">$ </span>curl <span class="nt">-u</span> <span class="s2">"USER:PASSWORD"</span> <span class="nt">-X</span> POST <span class="nt">-H</span> <span class="s2">"Content-Type:application/json"</span> <span class="s2">"https://HostName/api/projects"</span>  <span class="nt">--insecure</span>   <span class="nt">-d</span> <span class="s1">'{"project_name": "testrpo","public": 0}'</span>
+</code></pre></div></div>
+
+<h6 id="查看项目日志">查看项目日志</h6>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>curl <span class="nt">-u</span> <span class="s2">"admin:Harbor12345"</span> <span class="nt">-X</span> POST <span class="nt">-H</span> <span class="s2">"Content-Type: application/json"</span> <span class="s2">"https://HostName/api/projects/{project_id}/logs/filter"</span> <span class="nt">-d</span> @log.json
+<span class="c"># cat log.json</span>
+<span class="o">{</span>
+  <span class="s2">"username"</span>: <span class="s2">"admin"</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<h3 id="账号管理">账号管理</h3>
+<h6 id="创建账号">创建账号</h6>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>curl <span class="nt">-u</span> <span class="s2">"admin:Harbor12345"</span> <span class="nt">-X</span> POST <span class="nt">-H</span> <span class="s2">"Content-Type: application/json"</span> <span class="s2">"https://HostName/api/users"</span> <span class="nt">-d</span> @user.json
+<span class="nv">$ </span><span class="nb">cat  </span>user.json
+
+<span class="o">{</span>
+
+  <span class="s2">"user_id"</span>: 5,
+
+  <span class="s2">"username"</span>: <span class="s2">"zhangsan"</span>,
+
+  <span class="s2">"email"</span>: <span class="s2">"zhangsan@gmail.com"</span>,
+
+  <span class="s2">"password"</span>: <span class="s2">"Zs202005"</span>,
+
+  <span class="s2">"realname"</span>: <span class="s2">"zhangsan"</span>,
+
+  <span class="s2">"role_id"</span>: 2
+
+<span class="o">}</span>
+
+</code></pre></div></div>
+
+<h6 id="获取用户信息">获取用户信息</h6>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>curl <span class="nt">-u</span> <span class="s2">"admin:Harbor12345"</span> <span class="nt">-X</span> GET <span class="nt">-H</span> <span class="s2">"Content-Type: 
+application/json"</span> <span class="s2">"https://HostName/api/users"</span>
+</code></pre></div></div>
+
+<h6 id="获取当前用户信息">获取当前用户信息</h6>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>curl <span class="nt">-u</span> <span class="s2">"admin:Harbor12345"</span> <span class="nt">-X</span> GET <span class="nt">-H</span> <span class="s2">"Content-Type: application/json"</span> <span class="s2">"https://HostName/api/users/current"</span>
+</code></pre></div></div>
+
+<h6 id="删除用户">删除用户</h6>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>curl <span class="nt">-u</span> <span class="s2">"admin:Harbor12345"</span> <span class="nt">-X</span> DELETE  <span class="nt">-H</span> <span class="s2">"Content-Type: application/json"</span> <span class="s2">"https://HostName/api/users/{user_id}"</span>
+</code></pre></div></div>
+
+<h6 id="修改用户密码">修改用户密码</h6>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>curl <span class="nt">-u</span> <span class="s2">"admin:Harbor12345"</span> <span class="nt">-X</span> PUT <span class="nt">-H</span> <span class="s2">"Content-Type: application/json"</span> <span class="s2">"https://HostName/api/users/{user_id}/password"</span> <span class="nt">-d</span> @uppwd.json
+
+<span class="nv">$ </span><span class="nb">cat </span>uppwd.json
+
+<span class="o">{</span>
+
+  <span class="s2">"old_password"</span>: <span class="s2">"Harbor123456"</span>,
+
+  <span class="s2">"new_password"</span>: <span class="s2">"Harbor888888"</span>
+
+<span class="o">}</span>
+</code></pre></div></div>
+
+<h3 id="用户权限管理">用户权限管理</h3>
+
+<h6 id="查看项目相关角色">查看项目相关角色</h6>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>curl <span class="nt">-u</span> <span class="s2">"admin:Harbor12345"</span> <span class="nt">-X</span> GET <span class="nt">-H</span> <span class="s2">"Content-Type: application/json"</span> <span class="s2">"https://HostName/api/projects/{project_id}/members/"</span>
+</code></pre></div></div>
+
+<h6 id="项目添加角色">项目添加角色</h6>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>curl <span class="nt">-u</span> <span class="s2">"jaymarco:Harbor123456"</span> <span class="nt">-X</span> POST  <span class="nt">-H</span> <span class="s2">"Content-Type: application/json"</span> <span class="s2">"https://HostName/api/projects/{project_id}/members/"</span> <span class="nt">-d</span> @role.json
+<span class="nv">$ </span><span class="nb">cat </span>role.json
+
+<span class="o">{</span>
+
+  <span class="s2">"roles"</span>: <span class="o">[</span>
+
+  <span class="o">]</span>,
+
+  <span class="s2">"username"</span>: <span class="s2">"guest"</span>
+
+<span class="o">}</span>
+</code></pre></div></div>
+
+<h6 id="删除项目中用户权限">删除项目中用户权限</h6>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>curl <span class="nt">-u</span> <span class="s2">"admin:Harbor12345"</span> <span class="nt">-X</span> DELETE <span class="nt">-H</span> <span class="s2">"Content-Type: application/json"</span> <span class="s2">"https:/HostName6/api/projects/{project_id}/members/{user_id}"</span>
+</code></pre></div></div>
+
+<h6 id="获取与用户相关的项目编号和存储库编号">获取与用户相关的项目编号和存储库编号</h6>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>curl <span class="nt">-u</span> <span class="s2">"admin:Harbor12345"</span> <span class="nt">-X</span> GET <span class="nt">-H</span> <span class="s2">"Content-Type: application/json"</span> <span class="s2">"https://HostName/api/statistics"</span>
+</code></pre></div></div>
+
+<h6 id="修改当前用户角色">修改当前用户角色</h6>
+<ul>
+  <li>has_admin_role ：0 普通用户</li>
+  <li>has_admin_role ：1 管理员
+```shell
+$ curl -u “admin:Harbor12345” -X PUT -H “Content-Type: application/json” “https://HostName/api/users/{user_id}/sysadmin “ -d @chgrole.json
+$ cat &gt;chgrole.json</li>
+</ul>
+
+<p>{</p>
+
+<p>“has_admin_role”: 1</p>
+
+<p>}</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+### 镜像管理
+###### 查询镜像
+```shell
+$ curl -u "admin:Harbor12345" -X GET -H "Content-Type: application/json" "https://HostName/api/repositories?project_id={project_id}&amp;q=dcos%2Fcentos"
+</code></pre></div></div>
+
+<h6 id="删除镜像">删除镜像</h6>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>curl <span class="nt">-u</span> <span class="s2">"admin:Harbor12345"</span> <span class="nt">-X</span> DELETE <span class="nt">-H</span> <span class="s2">"Content-Type: application/json"</span> <span class="s2">"https://HostName/api/repositories?repo_name=dcos%2Fetcd "</span>
+</code></pre></div></div>
+
+<h6 id="获取镜像标签">获取镜像标签</h6>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>curl <span class="nt">-u</span> <span class="s2">"admin:Harbor12345"</span> <span class="nt">-X</span> GET <span class="nt">-H</span> <span class="s2">"Content-Type: application/json"</span> <span class="s2">"https://HostName/api/repositories/tags?repo_name=dcos%2Fcentos"</span>
+</code></pre></div></div>
+:ET

@@ -1,0 +1,69 @@
+I"]<h3 id="一将本地目录纳管到git">一、将本地目录纳管到git</h3>
+<p>1、本地安装git</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ yum install git
+</code></pre></div></div>
+
+<p>2、git最小化配置</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>设置提交代码时的用户信息
+$ git config --global user.name 'captain'
+$ git config --global user.email '13601131440@163.com'
+$ git config --global --list
+user.name=captain
+user.email=13601131440@163.com
+</code></pre></div></div>
+
+<p>3、将本地目录纳管到git</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ cd /xmsny 
+$ git init //初始化本地仓库
+$ git add . //将本目录所有目录和文件纳管到git， 可以使用.和--all
+$ git commit -m"This my blog" //将缓存区代码提交到git
+[master (root-commit) 4d432e4] blog
+ 79 files changed, 27477 insertions(+)
+ create mode 100644 .gitignore
+.......
+</code></pre></div></div>
+<blockquote>
+  <p>git add将代码提交到缓存区，git commit将缓冲区代码提交到仓库</p>
+</blockquote>
+
+<h3 id="二同步本地仓库到github">二、同步本地仓库到github</h3>
+<p>1、创建ssh密钥</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ssh-keygen -t rsa -b 4096 -C "13601131440@163.com"
+</code></pre></div></div>
+
+<p>2、将公钥复制到github上</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ cat  ~/.ssh/id_rsa.pub 
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC9BE2xAXx97VV5C8XSn1Rh7w3BoHoXDqD/52ep7ILdvOaOZzwa405ymSX9ZyPDfWxn6yh9rSOcIFKjtNWSoYfWXQjx64W/thK43Gj/6xEErTA+J4sdn2ZcDuOBRzsociQ5PHnR+fhV/8RYkkxJSmpHERgoj6RGpALVTvRrBdZTbaV8Rm08KVbZvSvnPH5coAvpAhTX7GfdB5qaCnPpeaD14RRV3Te96fZZUoyoqiWr0fu7IDTLJpvQt5A+2FF81DDvuE5R5MzySmXMZzVX7SB7RHGZoUuj+3DwNB2JKhv8CILOG0fiXhJgvwfys4rfk/QdyBKXM91cREdMRWUCFGuFSedcRs7jEH0/5X1oqd7P5WRkgsCYLS08F+/u/79VHBINdkb3RTbTXGk3rlJBKb5WgL5TgAsDNqffh98ssvWoydkzvuz5mWy0QeIcHQr3SUIKQeHdxYmTJVcWwx/4FRAdksfu8dTkF3wW52egPqRc9jjtBmZp1iW5Vhl//FNP0Bk8PTum9DfenjxOFvzZ1q2f13Z7tLB9yjXEbj4ORttWtBQvUR08RKRFvt/gppkzAbaaEZYCTU8BB5xDQKgvGrVzv68kQzsE0nHs8gLE4WieoHUAVH84acwDgEwS+0sjnHdKy8W4T0FmB9K1EhHFDiT2WoWoV3UAHSu1JreCQeK9PQ== 13601131440@163.com
+</code></pre></div></div>
+
+<p>3、连接到远程仓库</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ git remote origin git@github.com:FangXiangmeng/xmsny.git
+</code></pre></div></div>
+
+<p>4、push代码到github</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ git push -u origin master
+Warning: Permanently added the RSA host key for IP address '52.74.223.119' to the list of known hosts.
+Counting objects: 109, done.
+Compressing objects: 100% (104/104), done.
+Writing objects: 100% (109/109), 2.31 MiB | 202.00 KiB/s, done.
+Total 109 (delta 4), reused 0 (delta 0)
+remote: Resolving deltas: 100% (4/4), done.
+To git@github.com:FangXiangmeng/xmsny.git
+ * [new branch]      master -&gt; master
+Branch master set up to track remote branch master from origin.
+</code></pre></div></div>
+
+<p>5、代码修改后，推送到github</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>1. git add .
+添加全部修改的代码，准备提交
+2. git commit -m"提交说明"
+将修改后的代码先提交到本地仓库
+3.git pull
+如果是多人协作开发的话，一定要先 pull ，将 github 的代码拉取到本地，这样在 merge 解决冲突的时候稍微简便些。默认拉取到 master分支（如果只是自己做这个项目，可以忽略pull）
+4.git push
+将代码推送到 github , 默认推送到 别名为 origin 的仓库中的 master 分支上。
+
+</code></pre></div></div>
+
+<p><a href="https://www.ruanyifeng.com/blog/2015/12/git-cheat-sheet.html">git命令学习</a></p>
+:ET

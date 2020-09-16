@@ -1,0 +1,209 @@
+I"�9<h2 id="shell整理">shell整理</h2>
+<p><strong>1.删除k8s所有devops开头的namespace</strong></p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code> for i in `kubectl get ns --all-namespaces  |awk '{print $1}'|grep  ^devops`;do kubectl delete ns $i ;done
+</code></pre></div></div>
+
+<p><strong>2.打包主机所有docker镜像</strong>
+<strong>v1只能打包镜像名称带/的</strong></p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c">#!/bin/bash</span>
+<span class="nv">i</span><span class="o">=</span>0
+<span class="k">while </span><span class="nb">true</span><span class="p">;</span>
+<span class="k">do
+   </span><span class="nb">let </span>i++
+   <span class="nv">ImageNameall</span><span class="o">=</span><span class="sb">`</span>docker images | <span class="nb">sort</span> | <span class="nb">grep</span> <span class="nt">-v</span> ^R | <span class="nb">awk</span> <span class="s1">'{print $1}'</span>| xargs <span class="nb">echo</span><span class="sb">`</span>
+   <span class="nv">ImageName</span><span class="o">=</span><span class="sb">`</span>docker images | <span class="nb">sort</span> | <span class="nb">awk</span>  <span class="s1">'{print $1}'</span>| <span class="nb">awk</span> <span class="nt">-F</span> / <span class="s1">'{print $2}'</span>| <span class="nb">grep</span> <span class="nt">-v</span> ^R | xargs <span class="nb">echo</span><span class="sb">`</span>
+   <span class="nv">ImageTag</span><span class="o">=</span><span class="sb">`</span>docker images | <span class="nb">sort</span> | <span class="nb">awk</span> <span class="s1">'{print $2}'</span>| <span class="nb">grep</span> <span class="nt">-v</span> ^T | xargs <span class="nb">echo</span><span class="sb">`</span>
+   <span class="nv">Imageamount</span><span class="o">=</span><span class="sb">`</span>docker images |grep <span class="nt">-v</span> ^R|wc <span class="nt">-l</span><span class="sb">`</span>
+   <span class="k">if</span> <span class="o">[</span> <span class="nv">$i</span> <span class="nt">-le</span> <span class="nv">$Imageamount</span> <span class="o">]</span><span class="p">;</span><span class="k">then
+      </span>docker save <span class="nt">-o</span>   <span class="sb">`</span><span class="nb">echo</span> <span class="nv">$ImageName</span>|cut <span class="nt">-d</span> <span class="s2">" "</span> <span class="nt">-f</span> <span class="nv">$i</span><span class="sb">`</span>.tar.gz  <span class="sb">`</span><span class="nb">echo</span> <span class="nv">$ImageNameall</span>|cut <span class="nt">-d</span> <span class="s2">" "</span> <span class="nt">-f</span> <span class="nv">$i</span><span class="sb">`</span>:<span class="sb">`</span><span class="nb">echo</span> <span class="nv">$ImageTag</span>|cut <span class="nt">-d</span> <span class="s2">" "</span> <span class="nt">-f</span> <span class="nv">$i</span><span class="sb">`</span>
+  <span class="k">else
+      </span><span class="nb">break
+   </span><span class="k">fi
+done</span>
+</code></pre></div></div>
+
+<p><strong>v2能打包镜像名称是centos和coredns/latest这种命名镜像</strong></p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c">#!/bin/bash</span>
+<span class="nv">i</span><span class="o">=</span>0
+<span class="k">while </span><span class="nb">true</span><span class="p">;</span>
+<span class="k">do
+   </span><span class="nb">let </span>i++
+   <span class="nv">ImageNameall</span><span class="o">=</span><span class="sb">`</span>docker images | <span class="nb">sort</span> | <span class="nb">grep</span> <span class="nt">-v</span> ^R | <span class="nb">awk</span> <span class="s1">'{print $1}'</span>| xargs <span class="nb">echo</span>|cut <span class="nt">-d</span> <span class="s2">" "</span> <span class="nt">-f</span><span class="nv">$i</span><span class="sb">`</span>
+   <span class="nv">ImageTag</span><span class="o">=</span><span class="sb">`</span>docker images | <span class="nb">sort</span> | <span class="nb">awk</span> <span class="s1">'{print $2}'</span>| <span class="nb">grep</span> <span class="nt">-v</span> ^T | xargs <span class="nb">echo</span><span class="sb">`</span>
+   <span class="nv">Imageamount</span><span class="o">=</span><span class="sb">`</span>docker images |grep <span class="nt">-v</span> ^R|wc <span class="nt">-l</span><span class="sb">`</span>
+   <span class="k">if</span> <span class="o">!</span> <span class="o">[[</span> <span class="nv">$ImageNameall</span> <span class="o">=</span>~ <span class="s2">"/"</span> <span class="o">]]</span> <span class="o">&amp;&amp;</span> <span class="o">[</span> <span class="nv">$i</span> <span class="nt">-le</span> <span class="nv">$Imageamount</span> <span class="o">]</span><span class="p">;</span><span class="k">then
+      </span>docker save <span class="nt">-o</span>  <span class="sb">`</span><span class="nb">echo</span> <span class="nv">$ImageNameall</span>|cut <span class="nt">-d</span> <span class="s2">" "</span> <span class="nt">-f</span> <span class="nv">$i</span><span class="sb">`</span>.tar.gz  <span class="sb">`</span><span class="nb">echo</span> <span class="nv">$ImageNameall</span>|cut <span class="nt">-d</span> <span class="s2">" "</span> <span class="nt">-f</span> <span class="nv">$i</span><span class="sb">`</span>:<span class="sb">`</span><span class="nb">echo</span> <span class="nv">$ImageTag</span>|cut <span class="nt">-d</span> <span class="s2">" "</span> <span class="nt">-f</span> <span class="nv">$i</span><span class="sb">`</span>
+   <span class="k">elif</span> <span class="o">[[</span> <span class="nv">$ImageNameall</span> <span class="o">=</span>~ <span class="s2">"/"</span> <span class="o">]]</span> <span class="o">&amp;&amp;</span> <span class="o">[</span> <span class="nv">$i</span> <span class="nt">-le</span> <span class="nv">$Imageamount</span> <span class="o">]</span><span class="p">;</span><span class="k">then
+      </span>docker save <span class="nt">-o</span>  <span class="sb">`</span><span class="nb">echo</span> <span class="nv">$ImageNameall</span>|awk <span class="nt">-F</span> / <span class="s1">'{print $2}'</span>|cut <span class="nt">-d</span> <span class="s2">" "</span> <span class="nt">-f</span> <span class="nv">$i</span><span class="sb">`</span>.tar.gz  <span class="sb">`</span><span class="nb">echo</span> <span class="nv">$ImageNameall</span>|cut <span class="nt">-d</span> <span class="s2">" "</span> <span class="nt">-f</span> <span class="nv">$i</span><span class="sb">`</span>:<span class="sb">`</span><span class="nb">echo</span> <span class="nv">$ImageTag</span>|cut <span class="nt">-d</span> <span class="s2">" "</span> <span class="nt">-f</span> <span class="nv">$i</span><span class="sb">`</span>
+   <span class="k">else
+      </span><span class="nb">break
+   </span><span class="k">fi
+done</span>
+
+</code></pre></div></div>
+
+<p><strong>3.删除k8s集群中所有pod状态是Terminating的</strong></p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c">#!/bin/bash</span>
+<span class="nv">delete</span><span class="o">=</span><span class="sb">`</span>kubectl get pod <span class="nt">--all-namespaces</span>  <span class="nt">-o</span> wide |grep  Terminating |awk <span class="s1">'{print $2}'</span><span class="sb">`</span>
+<span class="nv">delete1</span><span class="o">=</span><span class="sb">`</span>kubectl get pod <span class="nt">--all-namespaces</span>  <span class="nt">-o</span> wide |grep  Terminating |awk <span class="s1">'{print $1}'</span><span class="sb">`</span>
+<span class="nv">i</span><span class="o">=</span>0
+<span class="k">for </span>a <span class="k">in</span> <span class="nv">$delete</span><span class="p">;</span><span class="k">do
+  </span><span class="nb">let </span>i++
+  kubectl delete pod <span class="nv">$a</span> <span class="nt">-n</span> <span class="sb">`</span><span class="nb">echo</span> <span class="nv">$delete1</span>|cut <span class="nt">-d</span> <span class="s2">" "</span> <span class="nt">-f</span> <span class="nv">$i</span><span class="sb">`</span> <span class="nt">--grace-period</span><span class="o">=</span>0 <span class="nt">--force</span>
+<span class="k">done</span>
+</code></pre></div></div>
+
+<p><strong>4.检测k8s Master Node上面组件状态</strong></p>
+<blockquote>
+  <p>Master需要更新
+```
+#!/bin/bash
+ Service_status_master=”kube-apiserver kube-controller-manager kube-scheduler flanneld docker”
+   for status in ${Service_status_master};do
+       service_status=<code class="highlighter-rouge">systemctl status ${status} |grep active |awk '{print $3}'|cut -d '(' -f2|cut -d ')' -f1</code>
+       if [ “${service_status}” == “running” ];then
+           echo -e “\033[32;1m ${status} status running \033[0m”
+           sleep 1
+       else
+           echo -e “\033[32;1m ${status} is dead, be being restart  \033[0m”
+           systemctl restart ${status}
+           sleep 3
+           service_status=<code class="highlighter-rouge">systemctl status ${status} |grep active |awk '{print $3}'|cut -d '(' -f2|cut -d ')' -f1</code>
+           if [[ “${service_status}” == “running” ]];then
+              echo -e “\033[32;1m ${status} restart scuueed \033[0m”
+           else
+              echo -e “\033[32;1m ${status} restart failure,please check the log \033[0m”
+           fi
+       fi
+   done</p>
+</blockquote>
+
+<p>Service_status_node=”kubelet kube-proxy docker flanneld”
+  for status in ${Service_status_node};do
+       service_status=<code class="highlighter-rouge">systemctl status ${status} |grep active |awk '{print $3}'|cut -d '(' -f2|cut -d ')' -f1</code>
+       if [ “${service_status}” == “running” ];then
+           echo -e “\033[32;1m ${status} status running \033[0m”
+           sleep 1
+       else
+           echo -e “\033[32;1m ${status} is dead, be being restart  \033[0m”
+           systemctl restart ${status}
+           sleep 3
+           service_status=<code class="highlighter-rouge">systemctl status ${status} |grep active |awk '{print $3}'|cut -d '(' -f2|cut -d ')' -f1</code>
+           if [[ “${service_status}” == “running” ]];then
+              echo -e “\033[32;1m ${status} restart scuueed \033[0m”
+           else
+              echo -e “\033[32;1m ${status} restart failure,please check the log \033[0m”
+           fi
+       fi
+   done</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+**5.expect使用**
+</code></pre></div></div>
+<p>#!/usr/bin/expect
+#set timeout 3600
+set host [lindex $argv 0]
+set username [lindex $argv 1]
+set password [lindex $argv 2]
+set src_file [lindex $argv 3]
+set dest_file [lindex $argv 4]
+#spawn scp $src_file $username@$host:$dest_file
+spawn scp $src_file  $username@$host:$dest_file
+expect {
+ “(yes/no)?” {
+   send “yes\n”
+   expect “<em>assword:” { send “$password\n”}
+  }
+  “</em>assword:” {
+   send “$password\n”
+  }
+}
+#expect “100%”
+expect eof</p>
+
+<p>#!/bin/bash
+##env
+src_dir=”/root/.ssh/id_rsa.pub”
+dest_dir=”/root/.ssh/authorized_keys”
+username=”root”
+host=”192.168.95.85 192.168.95.87”
+password=”ultra#2018#85 ultra#2018#87”
+i=0
+for hostip in $host
+do
+  echo $hostip
+  let i++
+   ./expect.exp $hostip $username <code class="highlighter-rouge">echo ${password} | cut -d " " -f $i</code>  $src_dir $dest_dir
+###cut -d “ “ -f $i:   -d：表示以什么做分割  -f 表示需要选取的字段，根据-d切分的字段集选取，下标从1开始，    i++表示，从1开始一直选取字段。
+done</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+**6.load当前目录下面的所有Imgaes**
+</code></pre></div></div>
+<p>for images in <code class="highlighter-rouge">ll |awk '{print $9}'</code> ;do docker load -i  $images ;done</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+**7.删除所有docker镜像**
+</code></pre></div></div>
+<p>docker rmi -f $(docker images -qa)</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+**8.vim中多行替换**
+</code></pre></div></div>
+<p>:1000,1120s/192.168.0.111/192.168.0.112/g</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+**9.遍历数组** 
+</code></pre></div></div>
+<p>//定义数组
+$ export variable=(arg1 arg2 arg3 ….)
+//获取下标为0的元素
+$ echo ${variable[0]}
+arg1
+//获取所有下标
+${#variable[@]}或者${#variable[*]}
+//那么如何用for遍历呢？一共有两种方式
+for i in ${variable[@]}; do echo $i;done
+for i in $(seq 0 ${#variable[@]}); do echo $i;done</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+**10.删除1天前的文件**
+</code></pre></div></div>
+<p>-amin n　　查找系统中最后N分钟访问的文件
+-atime n　　查找系统中最后n<em>24小时访问的文件
+-cmin n　　查找系统中最后N分钟被改变文件状态的文件
+-ctime n　　查找系统中最后n</em>24小时被改变文件状态的文件
+-mmin n　　查找系统中最后N分钟被改变文件数据的文件
+-mtime n　　查找系统中最后n*24小时被改变文件数据的文件</p>
+
+<p>$ find ./ -mtime +1 -exec rm -rf {} \;  /删除1天前的件
+$ find ./ -type f -mmin +1 -exec ls -l {} \;  /删除1分钟前的文件
+$ find ./ -size +10M |xargs rm -f  /删除大于10m的文件</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+**11.批量push私有仓库镜像到Harbor**
+</code></pre></div></div>
+<p>#!/bin/bash
+imagesname=($(docker images |grep ^192.168 |awk ‘{print $1}’))
+tag=($(docker images |grep ^192.168 |awk ‘{print $2}’))
+i=0
+while true
+do
+  docker push ${imagesname[$i]}:${tag[$i]}
+  let i++
+done</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+**12.查看证书有效时间**
+</code></pre></div></div>
+<p>openssl x509 -in /etc/kubernetes/ssl/ca.pem -noout -text |grep ‘ Not ‘</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+**13、去掉win转linux中多余得^m**
+</code></pre></div></div>
+<p>$ sed -i ‘s/\r//g’</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+**14、cp文件夹下当天文件**
+</code></pre></div></div>
+<p>#!/bin/bash
+targetdir=/data
+sourcedir=(/Ultrapower/webhome/meopen/style/rollInfoImages/ /Ultrapower/webhome/meopen_slave/style/rollInfoImages/)</p>
+
+<p>for file in ${sourcedir[@]};
+do
+    find ${file} -type f -mtime -1 -name “*” | xargs -i cp -rf  {}  ${targetdir}
+done
+```</p>
+:ET

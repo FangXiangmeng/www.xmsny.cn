@@ -1,0 +1,30 @@
+I"�<h2 id="tomcat85配置账号密码">tomcat8.5配置账号密码</h2>
+
+<p>tomcat8以前配置tomcat-users.xml就能访问manager和host-manager项目, 来管理和查看tomcat状态.
+再tomcat8开始, 只修改tomcat-users还是会出现403, 禁止访问.
+原因是tomcat8开始, 默认只能本机访问管理项目, 再host-manager和manager项目下的/META-INF/下有个context.xml</p>
+
+<p>1、默认开启了访问控制，只允许本地127远程访问。调试能远程访问。</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ vi /usr/local/apache-tomcat-8.5.32/webapps/host-manager/META-INF/context.xml
+##注释或者将allow改为\d+\.\d+\.\d+\.\d+|::1|0:0:0:0:0:0:0:1即可(这里使用注释)
+
+&lt;!--  &lt;Valve className="org.apache.catalina.valves.RemoteAddrValve"
+         allow="127\.\d+\.\d+\.\d+|::1|0:0:0:0:0:0:0:1" /&gt; --&gt;
+</code></pre></div></div>
+
+<p>2、修改tomcat-user.xml</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ /usr/local/apache-tomcat-8.5.32/conf/tomcat-users.xml
+##末尾添加
+  &lt;role rolename="manager-gui"/&gt;
+  &lt;role rolename="manager-script"/&gt;
+  &lt;role rolename="manager-jmx"/&gt;
+  &lt;role rolename="manager-status"/&gt;
+  &lt;role rolename="admin-gui"/&gt;
+  &lt;role rolename="admin-script"/&gt;
+  &lt;user username="admin" password="123456" roles="manager-gui,manager-script,manager-jmx,manager-status,admin-gui,admin-script"/&gt;
+</code></pre></div></div>
+<blockquote>
+  <p>有6个角色, 分别是manager=(manager-gui, manager-script), manager-jmx, manager-status, admin=(admin-gui,admin-script), 为了细粒度控制, 所以再manager和admin角色上分出来更细的角色, 角色名称固定的, 不是自定义的.</p>
+</blockquote>
+
+:ET
